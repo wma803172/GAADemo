@@ -12,6 +12,8 @@
   const PI = Math.PI;
   const color = {
     channel: [0.99, 0.44, 0.105],
+    channelOff: [0.71, 0.32, 0.115],
+    channelFlow: [1.0, 0.97, 0.72],
     alloy: [0.64, 0.71, 0.76],
     terminal: [0.38, 0.44, 0.5],
     liner: [0.62, 0.96, 0.93],
@@ -76,6 +78,12 @@
     return a.slice(1).map((v, j) => mix(v, b[j + 1], t));
   }
   const cellEnds = [-2.22, 2.22];
+  let gateOpen = true;
+  // This schematic holds a source–drain bias fixed. Tracers show conduction
+  // within the silicon; their speed and number do not represent measurements.
+  function gateFocus(p) {
+    return interval(0.72, 0.86, 2.35, 2.49, p);
+  }
   function geometry(p, now) {
     count = 0;
     const focus = interval(0.18, 0.92, 3.23, 3.66, p);
@@ -101,6 +109,8 @@
     const trace = ease(5.59, 6.02, p) * (1 - 0.71 * ease(6.53, 7, p));
     const pulse = 0.5 + 0.5 * Math.sin(now * 1.7);
     const gateLight = interval(1.52, 1.88, 2.25, 2.51, p);
+    const switching = gateFocus(p);
+    const channelTint = color.channel.map((v, i) => mix(v, color.channelOff[i], gateOpen ? 0 : switching));
     const device = (origin, scale, zOrigin, network, right, appear, first) => {
       if (scale < 0.001) return;
       const box = (x, y, z, w, h, d, col, r = 0.035, e = 0, m = 0.84) =>
@@ -128,12 +138,54 @@
           cut - start,
           0.146,
           1.2,
-          color.channel,
+          channelTint,
           0.066,
           0.06 + 0.16 * gateLight,
           0.6,
         );
         box(0, y, 0, 0.853 * liner, 0.221, 1.295, color.liner, 0.078, 0.06 + 0.18 * gateLight, 0.39);
+        if (first && gateOpen && switching > 0) {
+          // Run the side markers along each exposed sheet. The common gate
+          // hides the middle of the path rather than allowing tracers across it.
+          const side = switching * (1 - section);
+          if (side > 0.025) {
+            for (let k = 0; k < 4; k++) {
+              const phase = (0.085 + now * 0.29 + k / 4) % 1;
+              const x = mix(start + 0.1, cut - 0.1, phase);
+              const edgeFade = ease(0.475, 0.61, Math.abs(x)) * side;
+              box(
+                x,
+                y,
+                0.607,
+                0.19 * edgeFade,
+                0.082 * edgeFade,
+                0.048 * edgeFade,
+                color.channelFlow,
+                0.024,
+                1,
+                0.2,
+              );
+            }
+          }
+          // Looking end-on, carriers would travel into/out of the screen.
+          // Mark each exposed cut face without inventing sideways flow.
+          const face = section * switching;
+          if (face > 0.05) {
+            const glow = face * (0.92 + 0.08 * Math.cos(now * 4));
+            box(
+              cut + 0.009,
+              y,
+              -0.04,
+              0.033 * face,
+              0.081 * glow,
+              0.23 * glow,
+              color.channelFlow,
+              0.015,
+              1.1,
+              0.2,
+            );
+          }
+        }
       }
       // Continuous metal at both edges and in all three inter-sheet gaps,
       // plus the outermost top and bottom. The dielectric surrounds each sheet.
@@ -342,6 +394,13 @@
       }
     }
     let anchors = [];
+    if (p >= 1.72 && p <= 2.36) {
+      const cut = mix(2.07, 0.445, section);
+      anchors = [
+        ["共用金属栅", [0.404, 1.66, 0.735]],
+        ["硅带沟道", [cut, 1.03, -0.34]],
+      ];
+    }
     if (backside > 0.0005) {
       const upper = -0.31 - 0.72 * expand,
         lower = upper - 0.23 - 0.63 * expand;
@@ -731,9 +790,21 @@
     raf = 0,
     pins = [];
   const reduce = matchMedia("(prefers-reduced-motion: reduce)");
+  function moving() {
+    return (
+      !document.hidden &&
+      !reduce.matches &&
+      ((gateOpen && gateFocus(progress) > 0) || (progress > 5.6 && progress < 6.84))
+    );
+  }
+  function setGateOpen(active) {
+    if (gateOpen === Boolean(active)) return;
+    gateOpen = Boolean(active);
+    if (gateFocus(progress) > 0 && !document.hidden) draw(progress);
+  }
   function draw(value) {
     progress = clamp(Number(value) || 0, 0, 7);
-    if (!surface || !drawFrame) return;
+    if (!surface || !drawFrame || document.hidden) return;
     const size = surface.getBoundingClientRect();
     if (size.width < 1 || size.height < 1) return;
     const ratio = Math.min(devicePixelRatio || 1, 1.65, 1450 / size.width);
@@ -775,17 +846,23 @@
       zoom,
     });
     lastStamp = performance.now();
-    if (!reduce.matches && progress > 5.6 && progress < 6.84 && !raf && !document.hidden)
-      raf = requestAnimationFrame(idle);
+    if (moving() && !raf) raf = requestAnimationFrame(idle);
   }
   function idle(t) {
     raf = 0;
-    if (document.hidden || reduce.matches || progress <= 5.6 || progress >= 6.84 || !surface) return;
+    if (!surface || !moving()) return;
     const box = surface.getBoundingClientRect();
     if (box.bottom <= 0 || box.top >= innerHeight) return;
     if (t - lastStamp > 36) draw(progress);
     if (!raf) raf = requestAnimationFrame(idle);
   }
+  function refreshMotion() {
+    cancelAnimationFrame(raf);
+    raf = 0;
+    if (!document.hidden) draw(progress);
+  }
+  document.addEventListener("visibilitychange", refreshMotion);
+  reduce.addEventListener("change", refreshMotion);
   function installFallback(canvas) {
     let ctx = canvas.getContext("2d");
     if (ctx) {
@@ -851,5 +928,5 @@
     draw(progress);
     return true;
   }
-  window.AtlasScene = Object.freeze({ mount, draw, getPins: () => pins });
+  window.AtlasScene = Object.freeze({ mount, draw, setGateOpen, getPins: () => pins });
 })();

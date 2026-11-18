@@ -233,6 +233,81 @@ a:focus-visible {
 .pin[data-material="signal"] {
   color: #8aede4;
 }
+.pin[data-material="gate"] {
+  color: #d9e3e6;
+}
+.gate-control {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 19px 0 0;
+  flex-wrap: wrap;
+}
+.gate-toggle {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid #71928a;
+  background: #172824;
+  color: #e7f5ee;
+  font: 600 14px/1.2 var(--sans);
+  border-radius: 24px;
+  min-height: 42px;
+  padding: 8px 16px 8px 11px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.gate-toggle:hover {
+  background: #233e36;
+  border-color: #a9d5c5;
+}
+.gate-toggle:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 4px;
+}
+.toggle-track {
+  width: 29px;
+  height: 16px;
+  border: 1px solid #707b78;
+  border-radius: 13px;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  background: #273330;
+}
+.toggle-track::after {
+  content: "";
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #d1d9d4;
+  transition: transform 0.18s ease;
+}
+.gate-toggle[data-open="true"] .toggle-track {
+  background: #7cddbc;
+  border-color: #7cddbc;
+}
+.gate-toggle[data-open="true"] .toggle-track::after {
+  background: #15382d;
+  transform: translateX(12px);
+}
+.gate-readout {
+  color: #b9c9c2;
+  font-size: 12px;
+  line-height: 1.4;
+}
+@media (max-width: 700px), (max-width: 950px) and (orientation: portrait) {
+  .gate-control {
+    margin-top: 10px;
+    gap: 9px;
+  }
+  .gate-toggle {
+    font-size: 13px;
+    min-height: 40px;
+    padding: 7px 11px;
+  }
+}
 .pin-point {
   position: absolute;
   width: 7px;

@@ -107,8 +107,8 @@
       at: 4.56,
       name: "背面电网展开",
       keys: [
-        ["supply", "VDD"],
-        ["ground", "VSS"],
+        ["supply", "供电 VDD"],
+        ["ground", "回流 VSS"],
         ["signal", "信号"],
       ],
     },
@@ -142,6 +142,32 @@
     needsMeasure = true,
     forceRedraw = true;
   const engine = window.AtlasScene;
+  let gateOpen = true;
+  const gateControls = [];
+  function updateGate(nextState, source) {
+    gateOpen = nextState;
+    engine.setGateOpen(nextState);
+    for (const control of gateControls) {
+      control.readout.setAttribute("aria-live", control === source ? "polite" : "off");
+      control.button.dataset.open = String(nextState);
+      control.action.textContent = nextState ? "关上开关" : "打开开关";
+      control.readout.textContent = nextState ? "四条路都在导电" : "已关断，只剩微小漏电";
+    }
+    queue();
+  }
+  if (engine?.setGateOpen) {
+    for (const host of document.querySelectorAll("[data-gate-controls]")) {
+      host.append(document.querySelector("#gate-control").content.cloneNode(true));
+      const button = host.querySelector("button");
+      const readout = host.querySelector(".gate-readout");
+      readout.id = host.closest("section").id + "-gate-state";
+      button.setAttribute("aria-describedby", readout.id);
+      button.dataset.open = "true";
+      const control = { button, readout, action: button.querySelector("span") };
+      gateControls.push(control);
+      button.addEventListener("click", () => updateGate(!gateOpen, control));
+    }
+  }
   function measure() {
     const y = window.scrollY;
     stops = sections.map((section) => section.getBoundingClientRect().top + y);
@@ -172,7 +198,7 @@
     );
   }
   function showPins(p) {
-    const pins = fitted && p > 4.7 && p < 6.65 ? (engine.getPins?.() ?? []) : [];
+    const pins = fitted ? (engine.getPins?.() ?? []) : [];
     for (const [i, node] of pinNodes.entries()) {
       const data = pins[i];
       const use = data && data.x >= 0 && data.x <= 1 && data.y >= 0 && data.y <= 1;
@@ -185,15 +211,16 @@
       }
       const network = data.label === "背面电网",
         signal = data.label === "正面信号";
-      node.pin.dataset.material = signal ? "signal" : "supply";
-      const sign = network || data.label === "本地接点" ? 1 : -1;
+      const metal = data.label === "共用金属栅";
+      node.pin.dataset.material = signal ? "signal" : metal ? "gate" : "supply";
+      const sign = network || data.label === "本地接点" || data.label === "硅带沟道" ? 1 : -1;
       const x = data.x * figureWidth,
         y = data.y * figureHeight;
       const reach = clamp(figureWidth * 0.075, 22, 65);
       const labelX = clamp(x + sign * reach - (sign < 0 ? node.width : 0), 4, figureWidth - node.width - 4);
       const rise = clamp(figureHeight * 0.06, 17, 44);
       const labelY = clamp(
-        y + (network || data.label === "供电通孔" ? -rise - node.height : rise),
+        y + (network || metal || data.label === "供电通孔" ? -rise - node.height : rise),
         4,
         figureHeight - node.height - 4,
       );
