@@ -93,6 +93,14 @@
     byId("figure-code").textContent = "FIG. " + number;
     byId("scene-count").textContent = number + " / 03";
     byId("figure-name").textContent = scenes[n].name;
+    const evidence = [
+      { frame: 3, stamp: "05:26" },
+      { frame: 2, stamp: "02:46" },
+      { frame: 5, stamp: "08:32" },
+    ][n];
+    const referenceLink = byId("scene-evidence");
+    referenceLink.href = "video.html?frame=" + evidence.frame + "#comparison";
+    referenceLink.textContent = "原片对照 " + evidence.stamp + " ↗";
     canvas.setAttribute("aria-label", scenes[n].alt);
   }
   function setTime(value, followDemo) {
@@ -249,8 +257,12 @@
     for (const link of links) link.classList.toggle("nav-current", link.hash === "#" + current);
   }
   addEventListener("scroll", navActive, { passive: true });
+  const initialScene = Number(new URLSearchParams(location.search).get("scene"));
   showScene(0);
-  controls();
+  setTime(
+    Number.isInteger(initialScene) && initialScene >= 0 && initialScene <= 2 ? initialScene * 12 : 0,
+    false,
+  );
   updateExplode();
   navActive();
 })();

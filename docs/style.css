@@ -1055,3 +1055,12 @@ footer span {
 .report-body nav {
   scroll-margin-top: 14px;
 }
+.evidence-link {
+  margin-left: auto;
+  white-space: nowrap;
+  color: #075f62;
+  font-size: 13px;
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
