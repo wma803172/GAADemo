@@ -2,239 +2,219 @@
 <html lang="zh-CN">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#132536" />
-    <meta
-      name="description"
-      content="用可旋转的晶体管剖面，理解 Intel 18A 的 RibbonFET 全环绕栅、并联纳米带与 PowerVia 背面供电。"
-    />
-    <title>Intel 18A 架构实验台 · 器件图鉴</title>
-    <link rel="icon" href="icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="style.css" />
-    <script src="model.js" defer></script>
-    <script src="lab.js" defer></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#090c0e" />
+    <meta name="description" content="从四条硅纳米带到背面供电，沿着 Intel 18A 晶体管的剖面向下探索。" />
+    <title>Intel 18A · 芯片的另一面 | Silicon Atlas</title>
+    <link rel="icon" href="assets/mark.svg" />
+    <link rel="preload" href="assets/hero.webp" as="image" fetchpriority="high" />
+    <link rel="stylesheet" href="journey.css" />
+    <script defer src="scene-render.js"></script>
+    <script defer src="journey.js"></script>
   </head>
   <body>
-    <a class="skip" href="#lab">跳到交互模型</a>
+    <a class="skip-link" href="#power">跳到背面供电</a>
     <header class="mast">
-      <div class="shell mast-inner">
-        <a class="brand" href="./index.html" aria-label="器件图鉴首页"
-          ><span class="mark" aria-hidden="true"><b></b><b></b><b></b></span><strong>器件图鉴</strong
-          ><span class="brand-en">DEVICE ATLAS</span></a
-        >
-        <nav aria-label="主导航">
-          <a class="nav-current" href="#lab">架构实验台</a><a href="#research">背景调研</a
-          ><a href="#sources">参考资料</a>
+      <div class="mast-inner">
+        <a class="wordmark" href="#overview" aria-label="Intel 18A 首页">
+          <img src="assets/mark.svg" alt="" width="28" height="28" />
+          <span>
+            Intel
+            <strong>18A</strong>
+          </span>
+        </a>
+        <nav aria-label="专题导航">
+          <a href="#ribbons">环绕栅</a>
+          <a href="#make">制造过程</a>
+          <a href="#power">
+            背面供电
+            <span aria-hidden="true">↘</span>
+          </a>
         </nav>
       </div>
+      <div class="progress-track" aria-hidden="true"><i></i></div>
     </header>
-    <main class="shell">
-      <section class="intro" aria-labelledby="page-title">
-        <div class="eyebrow"><span class="rule"></span> 半导体工艺 <i>/</i> PROCESS ARCHITECTURE</div>
-        <h1 id="page-title"><span lang="en">Intel 18A</span> 架构实验台</h1>
-        <div class="intro-bottom">
-          <p>沿剖面观察四条硅纳米带，看栅极如何控制沟道、电源如何从芯片背面抵达器件。</p>
-          <a class="report-link" href="learn.html">从头学：七步造开关 <span aria-hidden="true">↗</span></a>
+    <main>
+      <div class="journey">
+        <figure class="cinema" aria-hidden="true">
+          <div class="light cool"></div>
+          <div class="light warm"></div>
+          <div class="film-stage">
+            <div class="ground-light"></div>
+            <canvas id="scene" role="presentation"></canvas>
+            <img class="hero-object" src="assets/hero.webp" fetchpriority="high" alt="" />
+            <img class="wafer-object" src="assets/wafer-field.webp" loading="lazy" alt="" />
+            <div id="diagram-pins" aria-hidden="true"></div>
+          </div>
+          <figcaption class="instrument">
+            <span class="caption-key" id="figure-name">器件剖面</span>
+            <span class="scale-note">非等比例</span>
+            <div id="keys"></div>
+          </figcaption>
+        </figure>
+        <div class="story">
+          <section class="moment intro" id="overview" data-part="overview">
+            <div class="copy">
+              <p class="topic">
+                <span lang="en">INTEL 18A</span>
+                <span class="rule"></span>
+                晶体管架构
+              </p>
+              <h1>
+                开关在正面。
+                <br />
+                <em>电从背面来。</em>
+              </h1>
+              <p class="lead">
+                一颗晶体管，四条硅纳米带。
+                <br />
+                沿着它向下看，芯片的另一面藏着一整张电网。
+              </p>
+              <a class="scroll-cue" href="#ribbons">
+                <span class="scroll-arrow" aria-hidden="true">↓</span>
+                向下探索
+              </a>
+            </div>
+          </section>
+          <section class="moment" id="ribbons" data-part="ribbons">
+            <div class="copy">
+              <p class="topic">
+                <span lang="en">RibbonFET</span>
+                <span class="rule"></span>
+                沟道
+              </p>
+              <h2>
+                四条路，
+                <br />
+                <em>上下叠放。</em>
+              </h2>
+              <p>
+                从左边的源极到右边的漏极，四条薄硅带接在同一对端子之间。它们可以同时导电，在一条路的占地上叠出了四条并联的路。
+              </p>
+            </div>
+          </section>
+          <section class="moment" id="gate" data-part="ribbons">
+            <div class="copy">
+              <p class="topic">
+                <span lang="en">Gate-all-around</span>
+                <span class="rule"></span>
+                环绕栅
+              </p>
+              <h2>
+                从四周，
+                <br />
+                <em>管住电流。</em>
+              </h2>
+              <p>
+                在栅极中央，横着切开硅带。每条硅带四周都贴着一层极薄的绝缘材料，外面才是金属栅。四层共用一个栅极，改变栅压，电场就能让沟道更容易导通，或者更难导通。
+              </p>
+            </div>
+          </section>
+          <section class="moment" id="make" data-part="make">
+            <div class="copy">
+              <p class="topic">
+                <span lang="en">Channel release</span>
+                <span class="rule"></span>
+                制造过程
+              </p>
+              <h2>
+                先叠起来，
+                <br />
+                <em>再抽掉夹层。</em>
+              </h2>
+              <p>
+                先交替长出硅和硅锗，把叠层刻成窄条，做好两端的源极和漏极。再只去掉栅区里的硅锗，两端托着硅带，中间便悬空了。空出来的地方先形成绝缘层，再填入金属栅。
+              </p>
+            </div>
+          </section>
+          <section class="moment" id="turn" data-part="make">
+            <div class="copy">
+              <p class="topic">
+                <span lang="en">Wafer flip</span>
+                <span class="rule"></span>
+                晶圆翻面
+              </p>
+              <h2>
+                托住正面，
+                <br />
+                <em>磨薄背面。</em>
+              </h2>
+              <p>
+                先从器件这一侧做好局部供电通孔，完成正面信号布线，再把正面贴到支撑晶圆上。整片翻过来，从背面逐渐磨薄，原先埋好的孔端就露出来了。
+              </p>
+            </div>
+          </section>
+          <section class="moment power" id="power" data-part="power">
+            <div class="copy">
+              <p class="topic">
+                <span lang="en">PowerVia</span>
+                <span class="rule"></span>
+                背面供电
+              </p>
+              <h2>
+                翻到背面，
+                <br />
+                <em>是一整张电网。</em>
+              </h2>
+              <p>
+                在露出的孔端接上多层金属线，背面就能负责配电。供电线 VDD 和回流线 VSS
+                各有自己的网络，彼此绝缘。正面腾出更多位置，让逻辑信号穿行。
+              </p>
+              <a class="detail-link" href="#route">
+                沿一条支路看进去
+                <span aria-hidden="true">↓</span>
+              </a>
+            </div>
+          </section>
+          <section class="moment power" id="route" data-part="power">
+            <div class="copy">
+              <p class="topic">
+                <span lang="en">PowerVia</span>
+                <span class="rule"></span>
+                供电路径
+              </p>
+              <h2>
+                穿过小孔，
+                <br />
+                <em>从侧边接入。</em>
+              </h2>
+              <p>
+                沿着金色支路走。电源线经纳米通孔，接到器件旁的本地金属接点，再连到需要供电的源漏端。青色线在另一面，负责把开关信号送到栅极。
+              </p>
+            </div>
+          </section>
+          <section class="moment end" id="whole" data-part="whole">
+            <div class="copy">
+              <p class="topic">
+                <span lang="en">Intel 18A</span>
+                <span class="rule"></span>
+                晶圆
+              </p>
+              <h2>
+                一面控制，
+                <br />
+                <em>一面供电。</em>
+              </h2>
+              <p>
+                把视野拉回整片晶圆。RibbonFET 改变每个开关控制电流的方式，PowerVia
+                改变电到达这些开关的路线。两种改变，在同一代工艺里相遇。
+              </p>
+              <a class="detail-link" href="#power">
+                再看背面供电
+                <span aria-hidden="true">↑</span>
+              </a>
+            </div>
+          </section>
         </div>
-      </section>
-
-      <section class="lab" id="lab" aria-label="Intel 18A 交互动画实验台">
-        <div class="left-lab">
-          <div class="viewport" id="viewport">
-            <div class="view-head">
-              <span class="figure-code" id="figure-code">FIG. 01</span
-              ><span id="figure-name">器件结构总览</span
-              ><button class="frame-btn" id="fullscreen" aria-label="全屏查看模型" title="全屏查看模型">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M9 4H4v5m11-5h5v5M4 15v5h5m11-5v5h-5" />
-                </svg>
-              </button>
-            </div>
-            <canvas
-              id="model"
-              tabindex="0"
-              aria-describedby="model-help"
-              aria-label="四条硅纳米带横跨源极和漏极，由一个共用栅极环绕。"
-            ></canvas>
-            <p class="sr-only" id="model-help">
-              拖动模型或使用左右方向键旋转。按 Home 恢复默认角度。可在右侧选择不同剖面。
-            </p>
-            <button id="activity" class="activity" type="button" aria-pressed="true" hidden>
-              沟道导通
-            </button>
-            <div class="view-foot">
-              <span class="drag-hint"
-                ><svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M6 10V6a6 6 0 0 1 12 0v11a6 6 0 0 1-12 0zM12 4v5" />
-                </svg>
-                拖动旋转</span
-              ><span>结构示意 · 非等比例</span>
-            </div>
-          </div>
-          <div class="transport">
-            <button id="play" class="play" type="button" aria-label="播放分步演示">
-              <span id="play-symbol" aria-hidden="true">▶</span
-              ><span id="play-text">播放演示</span></button
-            ><input
-              id="timeline"
-              type="range"
-              min="0"
-              max="36"
-              value="0"
-              step="0.1"
-              aria-label="演示时间轴"
-            /><span id="clock" class="mono">00:00 / 00:36</span>
-          </div>
-        </div>
-
-        <aside class="inspector" aria-label="场景与模型控制">
-          <div class="inspector-head">
-            <h2>观察场景</h2>
-            <span class="mono" id="scene-count">01 / 03</span>
-          </div>
-          <div class="scene-list" role="group" aria-label="选择观察场景">
-            <button class="scene selected" data-scene="0" aria-pressed="true">
-              <span class="scene-num">01</span
-              ><span><strong>器件结构总览</strong><small>Architecture</small></span
-              ><span class="scene-arrow" aria-hidden="true">↗</span>
-            </button>
-            <button class="scene" data-scene="1" aria-pressed="false">
-              <span class="scene-num">02</span
-              ><span><strong>全环绕栅剖面</strong><small>RibbonFET</small></span
-              ><span class="scene-arrow" aria-hidden="true">↗</span>
-            </button>
-            <button class="scene" data-scene="2" aria-pressed="false">
-              <span class="scene-num">03</span
-              ><span><strong>背面供电路径</strong><small>PowerVia</small></span
-              ><span class="scene-arrow" aria-hidden="true">↗</span>
-            </button>
-          </div>
-          <div class="tools">
-            <div class="tools-row">
-              <label for="explode">分层展开</label
-              ><output for="explode" id="separation" class="mono">0%</output>
-            </div>
-            <input id="explode" type="range" min="0" max="100" step="1" value="0" />
-            <div class="tools-row lower">
-              <label for="labels">部件标注</label
-              ><input class="toggle" type="checkbox" id="labels" checked />
-            </div>
-            <button type="button" class="reset" id="reset">
-              <span aria-hidden="true">↺</span> 复位视图
-            </button>
-          </div>
-        </aside>
-      </section>
-      <div class="annotation" aria-live="polite">
-        <span class="annotation-kicker"><span class="signal-dot"></span>观察要点</span>
-        <p id="caption">先看蓝色硅带的两端。它们共用源极和漏极，中段受同一个栅极控制；下方金属承担供电。</p>
-        <a class="evidence-link" id="scene-evidence" href="video.html?frame=3#comparison"
-          >原片对照 05:26 ↗</a
-        >
       </div>
-      <noscript
-        ><p>
-          浏览器开启 JavaScript 后可旋转和播放模型。也可以直接<a href="research.html">阅读图文调研</a>。
-        </p></noscript
-      >
-
-      <section class="research-block" id="research">
-        <div class="section-title">
-          <div>
-            <div class="eyebrow"><span class="rule"></span> RESEARCH NOTES</div>
-            <h2>背景调研</h2>
-          </div>
-          <a href="research.html" class="plain-link">阅读全文 <span aria-hidden="true">↗</span></a>
-        </div>
-        <div class="research-grid">
-          <article>
-            <div class="chapter-no">01 <span>/ DEVICE</span></div>
-            <h3>为什么要把栅极绕一圈？</h3>
-            <p>
-              从 FinFET 的三面栅，到每条硅带的上下左右都受控制。沿电流和垂直电流的两个方向看同一只管子。
-            </p>
-            <a href="research.html#device">从沟道看结构 <span aria-hidden="true">→</span></a>
-          </article>
-          <article>
-            <div class="chapter-no">02 <span>/ POWER</span></div>
-            <h3>电源从背面怎样走上来？</h3>
-            <p>从背面金属网沿纳米通孔追到本地接点，再把这条路径与正面传送栅极信号的路线对照。</p>
-            <a href="research.html#power">沿供电路径阅读 <span aria-hidden="true">→</span></a>
-          </article>
-          <article>
-            <div class="chapter-no">03 <span>/ EVIDENCE</span></div>
-            <h3>怎样读懂性能数字？</h3>
-            <p>分清测试芯片、工艺平台和具体产品。看同功耗、同速度以及供电压降各自回答什么问题。</p>
-            <a href="research.html#evidence">查看指标与条件 <span aria-hidden="true">→</span></a>
-          </article>
-        </div>
-      </section>
-      <section class="research-block" id="classroom" aria-labelledby="classroom-heading">
-        <div class="section-title">
-          <div>
-            <div class="eyebrow"><span class="rule"></span> CLASSROOM</div>
-            <h2 id="classroom-heading">跟着图学</h2>
-          </div>
-        </div>
-        <div class="research-grid">
-          <article>
-            <div class="chapter-no">01 <span>/ PROCESS</span></div>
-            <h3>四条硅带是怎么造出来的？</h3>
-            <p>从硅和硅锗的交替叠层开始，每点一步只看一次变化，直到正面走信号、背面通电。</p>
-            <a href="learn.html#process">七步制造图解 →</a>
-          </article>
-          <article>
-            <div class="chapter-no">02 <span>/ CIRCUIT</span></div>
-            <h3>我按下 0，为什么会读出 1？</h3>
-            <p>切换输入，看看两只互补开关中哪一只负责充电，哪一只负责放电。</p>
-            <a href="learn.html#switch">自己拨动开关 →</a>
-          </article>
-          <article>
-            <div class="chapter-no">03 <span>/ VIDEO</span></div>
-            <h3>对照视频里的原画面</h3>
-            <p>按讲解时间回到原视频，再切回对应的剖面，检查自己认出的结构。</p>
-            <a href="video.html">查看关键帧 →</a>
-          </article>
-        </div>
-      </section>
-      <section id="sources" class="sources">
-        <div class="section-title">
-          <div>
-            <div class="eyebrow"><span class="rule"></span> REFERENCES</div>
-            <h2>参考资料</h2>
-          </div>
-        </div>
-        <a
-          href="https://www.intel.com/content/dam/www/central-libraries/us/en/documents/2026-06/foundry-18a-technology-brief.pdf"
-          target="_blank"
-          rel="noopener"
-          ><b>01</b
-          ><span
-            ><strong>Intel 18A 工艺技术简报</strong><small>Intel Foundry · 图 1、2、4 · 2026</small></span
-          ><em>PDF ↗</em></a
-        >
-        <a
-          href="https://archive.vlsisymposium.org/25web/wp-content/uploads/09_EN_Technical-Tip-Sheet-VLSI-2025_EN_250522.pdf"
-          target="_blank"
-          rel="noopener"
-          ><b>02</b
-          ><span
-            ><strong>Intel 18A 平台技术与性能测试</strong
-            ><small>IEEE / JSAP Symposium on VLSI · T1-1 · 2025</small></span
-          ><em>PDF ↗</em></a
-        >
-        <a href="research.html#references"
-          ><b>03</b
-          ><span><strong>完整出处与证据边界</strong><small>器件、互连、测试片与公开实物证据</small></span
-          ><em>查阅 →</em></a
-        >
-      </section>
     </main>
     <footer>
-      <div class="shell">
-        <span>器件图鉴 <i>/</i> DEVICE ATLAS</span
-        ><a href="https://github.com/wma803172/GAADemo">GAADemo · GitHub ↗</a>
-      </div>
+      <span>
+        Intel 18A
+        <i>/</i>
+        RibbonFET &amp; PowerVia
+      </span>
+      <a href="#overview">回到顶部 ↑</a>
     </footer>
   </body>
 </html>
