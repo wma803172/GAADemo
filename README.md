@@ -1,0 +1,9 @@
+# Intel 18A 架构实验台
+
+通过三个可以旋转、分层和播放的模型，观察 Intel 18A 的四层 RibbonFET 沟道、全环绕栅剖面和 PowerVia 背面供电路径。
+
+- **看动画**　下载仓库，在浏览器打开 [docs/index.html](docs/index.html)。点「播放演示」会在 36 秒内走完三个场景，也可以直接选择场景、拖动模型和时间轴。
+- **读调研**　浏览器版附剖面图和实验数据表。也可以直接在 GitHub 阅读 [中文调研稿](docs/research.md)，每一节都给出了公开资料出处。
+- **编辑**　[首页](docs/index.html)和[样式](docs/style.css)控制页面内容与排版。[模型](docs/model.js)描述晶体管和互连几何，[交互脚本](docs/lab.js)控制播放、旋转与标注。调研的网页和 Markdown 各有一份，修改研究结论时请同步更新两份。
+
+网页使用原生 HTML、CSS 和 JavaScript，可离线运行。模型使用示意比例，电流光点和分层距离用于教学展示。
