@@ -26,7 +26,7 @@
     return { pin, line, label, width: 0, height: 0 };
   });
   const motion = matchMedia("(prefers-reduced-motion: reduce)");
-  const portrait = matchMedia("(max-width:700px), (max-width:950px) and (orientation:portrait)");
+  const portrait = matchMedia("(max-width:950px) and (orientation:portrait)");
   const colors = {
     silicon: "#ffa74c",
     gate: "#d1d9df",
@@ -48,7 +48,7 @@
     },
     {
       at: 0.68,
-      name: "源极 → 漏极",
+      name: "源极与漏极之间",
       keys: [
         ["silicon", "硅带"],
         ["gate", "共用栅"],
@@ -72,7 +72,15 @@
       ],
     },
     {
-      at: 2.91,
+      at: 2.77,
+      name: "形成内间隔层",
+      keys: [
+        ["silicon", "硅"],
+        ["germanium", "硅锗"],
+      ],
+    },
+    {
+      at: 2.87,
       name: "释放沟道",
       keys: [
         ["silicon", "硅"],
@@ -80,15 +88,31 @@
       ],
     },
     {
-      at: 3.13,
-      name: "形成环绕栅",
+      at: 3.12,
+      name: "包覆栅介质",
+      keys: [
+        ["silicon", "硅"],
+        ["insulator", "栅介质"],
+      ],
+    },
+    {
+      at: 3.22,
+      name: "填入金属栅",
       keys: [
         ["insulator", "绝缘层"],
         ["gate", "金属栅"],
       ],
     },
     {
-      at: 3.48,
+      at: 3.36,
+      name: "形成器件接点",
+      keys: [
+        ["gate", "金属栅"],
+        ["silicon", "硅带"],
+      ],
+    },
+    {
+      at: 3.49,
       name: "器件侧预制通孔",
       keys: [
         ["supply", "供电通孔"],
@@ -96,15 +120,47 @@
       ],
     },
     {
-      at: 3.75,
-      name: "支撑、翻面与减薄",
+      at: 3.6,
+      name: "完成正面布线",
+      keys: [
+        ["signal", "信号线"],
+        ["supply", "通孔"],
+      ],
+    },
+    {
+      at: 3.7,
+      name: "键合支撑晶圆",
+      keys: [
+        ["carrier", "支撑晶圆"],
+        ["signal", "正面信号"],
+      ],
+    },
+    {
+      at: 3.8,
+      name: "整片翻面",
       keys: [
         ["carrier", "支撑晶圆"],
         ["supply", "通孔"],
       ],
     },
     {
-      at: 4.56,
+      at: 4.1,
+      name: "减薄原衬底",
+      keys: [
+        ["carrier", "支撑晶圆"],
+        ["supply", "通孔"],
+      ],
+    },
+    {
+      at: 4.36,
+      name: "孔端连接背面金属",
+      keys: [
+        ["supply", "供电线"],
+        ["ground", "回流线"],
+      ],
+    },
+    {
+      at: 4.69,
       name: "背面电网展开",
       keys: [
         ["supply", "供电 VDD"],
@@ -123,7 +179,23 @@
     },
     { at: 6.79, name: "晶圆表面示意", keys: [] },
   ];
-  const stillPoints = [0, 1, 2, 2.78, 3.03, 3.34, 3.57, 3.82, 4.17, 4.46, 5.14, 6.22, 7];
+  const stillPoints = [
+    0, 1, 2, 2.66, 2.85, 3.04, 3.17, 3.34, 3.43, 3.55, 3.65, 3.76, 4, 4.34, 4.5, 5.14, 6.22, 7,
+  ];
+  // Placement is in screen space; attachment points come from 3D geometry.
+  const callouts = {
+    背面电网: ["supply", 1, -1],
+    正面信号: ["signal", -1, 1],
+    供电通孔: ["supply", -1, -1],
+    本地接点: ["supply", 1, 1],
+    共用金属栅: ["gate", -1, -1],
+    硅带沟道: ["supply", 1, 1],
+    内间隔层: ["signal", 1, -1],
+    硅锗夹层: ["gate", -1, 1],
+    支撑晶圆: ["gate", 1, 1],
+    原硅衬底: ["gate", -1, -1],
+    露出的孔端: ["supply", -1, -1],
+  };
   const clamp = (value, min = 0, max = 1) => Math.min(max, Math.max(min, value));
   function blend(start, end, value) {
     const t = clamp((value - start) / (end - start));
@@ -209,18 +281,15 @@
         node.width = node.label.offsetWidth;
         node.height = node.label.offsetHeight;
       }
-      const network = data.label === "背面电网",
-        signal = data.label === "正面信号";
-      const metal = data.label === "共用金属栅";
-      node.pin.dataset.material = signal ? "signal" : metal ? "gate" : "supply";
-      const sign = network || data.label === "本地接点" || data.label === "硅带沟道" ? 1 : -1;
+      const [material, sign, vertical] = callouts[data.label] ?? ["gate", 1, -1];
+      node.pin.dataset.material = material;
       const x = data.x * figureWidth,
         y = data.y * figureHeight;
       const reach = clamp(figureWidth * 0.075, 22, 65);
       const labelX = clamp(x + sign * reach - (sign < 0 ? node.width : 0), 4, figureWidth - node.width - 4);
       const rise = clamp(figureHeight * 0.06, 17, 44);
       const labelY = clamp(
-        y + (network || metal || data.label === "供电通孔" ? -rise - node.height : rise),
+        y + (vertical < 0 ? -rise - node.height : rise),
         4,
         figureHeight - node.height - 4,
       );

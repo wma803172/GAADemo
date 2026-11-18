@@ -137,6 +137,7 @@ a:focus-visible {
 .journey {
   position: relative;
   isolation: isolate;
+  overflow: clip;
   background: var(--background);
 }
 .cinema {
@@ -297,7 +298,7 @@ a:focus-visible {
   font-size: 12px;
   line-height: 1.4;
 }
-@media (max-width: 700px), (max-width: 950px) and (orientation: portrait) {
+@media (max-width: 950px) and (orientation: portrait) {
   .gate-control {
     margin-top: 10px;
     gap: 9px;
@@ -576,7 +577,7 @@ footer i {
     display: none;
   }
 }
-@media (max-width: 700px), (max-width: 950px) and (orientation: portrait) {
+@media (max-width: 950px) and (orientation: portrait) {
   :root {
     --nav-height: 54px;
     --gutter: 6vw;
@@ -654,6 +655,9 @@ footer i {
     width: 100%;
     max-width: 100%;
   }
+  .moment :is(a, button) {
+    scroll-margin-top: calc(var(--nav-height) + 50svh);
+  }
   .topic {
     font-size: 11px;
     margin: 0 0 11px;
@@ -726,6 +730,9 @@ footer i {
   .intro {
     padding-top: calc(var(--nav-height) + 41svh);
   }
+  .moment :is(a, button) {
+    scroll-margin-top: calc(var(--nav-height) + 41svh);
+  }
   .copy > p:not(.topic) {
     font-size: 13px;
   }
@@ -763,11 +770,45 @@ footer i {
     margin-top: 9px;
   }
 }
+@media (max-width: 700px) and (orientation: landscape) {
+  .moment .copy {
+    width: 41vw;
+  }
+  .film-stage {
+    left: 46%;
+  }
+  .instrument {
+    left: 47%;
+    gap: 6px;
+    font-size: 9px;
+  }
+  .instrument::before {
+    display: none;
+  }
+  #keys {
+    gap: 7px;
+  }
+  .gate-control {
+    margin-top: 9px;
+    gap: 7px;
+  }
+  .gate-toggle {
+    min-height: 38px;
+    font-size: 12px;
+    padding: 6px 10px;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     animation-duration: 0s !important;
     transition-duration: 0s !important;
+  }
+}
+@media (forced-colors: active) {
+  #keys i {
+    forced-color-adjust: none;
+    outline: 1px solid CanvasText;
   }
 }

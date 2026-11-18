@@ -56,8 +56,9 @@
     [1.35, 0.56, 0.22, 5.6, 3.72, 1.12, 0],
     [1.92, 1.47, 0.072, 3.72, 3.12, 1.14, 0],
     [2.28, 1.52, 0.05, 3.45, 2.91, 1.14, 0],
-    [2.74, 0.55, 0.24, 5.66, 3.47, 1.1, 0],
-    [3.32, 0.5, 0.24, 5.78, 3.6, 1.1, 0],
+    [2.74, 0.55, 0.24, 5.25, 3.47, 1.1, 0],
+    [3.04, 0.4, 0.23, 4.5, 3.15, 1.07, 0],
+    [3.32, 0.5, 0.24, 5.1, 3.6, 1.1, 0],
     [3.6, 0.48, 0.33, 7.55, 5.66, 0.76, 0],
     [3.96, 0.4, 0.32, 8.5, 6.1, 0.42, 0],
     [4.38, 0.47, 0.35, 8.52, 6.48, 0.47, 0],
@@ -88,12 +89,14 @@
     count = 0;
     const focus = interval(0.18, 0.92, 3.23, 3.66, p);
     const section = interval(1.24, 1.9, 2.31, 2.71, p);
-    const fab = interval(2.4, 2.72, 3.18, 3.46, p);
-    const removeGe = ease(2.86, 3.13, p);
-    const gate = 1 - fab;
-    const liner = 1 - interval(2.42, 2.68, 3.09, 3.23, p);
+    const fab = interval(2.49, 2.64, 3.22, 3.36, p);
+    const removeGe = ease(2.87, 3.1, p);
+    const gate = 1 - interval(2.38, 2.49, 3.22, 3.36, p);
+    const liner = 1 - interval(2.39, 2.51, 3.12, 3.22, p);
     const externals = 1 - focus;
-    const second = ease(4.4, 4.91, p);
+    // Pull back from the process detail to show the neighbouring device before
+    // local vias, frontside interconnects and the bonded carrier are formed.
+    const second = ease(3.36, 3.49, p);
     const vddScale = mix(1, 0.52, second),
       vddOrigin = -1.39 * second;
     const vssScale = 0.52 * second,
@@ -103,9 +106,12 @@
     const expand = interval(4.43, 5.11, 6.52, 7.15, p);
     const signalRise = 0.5 * expand;
     const signalBase = 0.12 + 2.3 * vddScale + signalRise;
-    const carrier = ease(3.59, 3.77, p);
-    const backside = 1 - ease(0.12, 0.71, p) + ease(4.32, 4.74, p);
-    const power = ease(4.73, 5.22, p);
+    const overview = 1 - ease(0.12, 0.71, p);
+    const frontWiring = overview + ease(3.6, 3.7, p);
+    const carrier = ease(3.7, 3.8, p);
+    const backside = overview + ease(4.36, 4.57, p);
+    const interlevelVias = overview + ease(4.57, 4.69, p);
+    const outsideRails = overview + ease(4.69, 4.91, p);
     const trace = ease(5.59, 6.02, p) * (1 - 0.71 * ease(6.53, 7, p));
     const pulse = 0.5 + 0.5 * Math.sin(now * 1.7);
     const gateLight = interval(1.52, 1.88, 2.25, 2.51, p);
@@ -128,8 +134,14 @@
         );
       // A section through the gate removes the near terminal and terminates
       // the ribbons at the slice plane so the insulator and metal stay visible.
-      const cut = mix(2.07, 0.445, first ? section : 0);
-      const start = mix(-2.065, -0.56, first ? section : 0);
+      // The long exposed bridges are a longitudinal cutaway. In the process
+      // close-up the S/D recess removes the stack outside the gate/spacers.
+      // S/D epitaxy then abuts the remaining Si ends before channel release.
+      const recess = first ? interval(2.69, 2.78, 3.32, 3.47, p) : 0;
+      const sheetEnd = mix(2.07, 0.6, recess);
+      const cut = mix(sheetEnd, 0.445, first ? section : 0);
+      const start = mix(-sheetEnd, -0.56, first ? section : 0);
+      const extraWidth = first ? 0.69 * interval(2.43, 2.6, 2.64, 2.72, p) : 0;
       for (const y of ribbonY) {
         box(
           (cut + start) * 0.5,
@@ -137,13 +149,27 @@
           0,
           cut - start,
           0.146,
-          1.2,
+          1.2 + extraWidth,
           channelTint,
           0.066,
           0.06 + 0.16 * gateLight,
           0.6,
         );
-        box(0, y, 0, 0.853 * liner, 0.221, 1.295, color.liner, 0.078, 0.06 + 0.18 * gateLight, 0.39);
+        if (liner > 0.002) {
+          // Coat the sheet in place when the released trench is clear.
+          box(
+            0,
+            y,
+            0,
+            0.853,
+            0.146 + 0.075 * liner,
+            1.2 + 0.095 * liner,
+            color.liner,
+            0.078,
+            0.06 + 0.18 * gateLight,
+            0.39,
+          );
+        }
         if (first && gateOpen && switching > 0) {
           // Run the side markers along each exposed sheet. The common gate
           // hides the middle of the path rather than allowing tracers across it.
@@ -195,8 +221,25 @@
       }
       for (const side of [-1, 1]) {
         box(0, 1.12, side * 0.721, 0.804, 1.855, 0.172 * gate, color.alloy, 0.035, 0, 0.91);
+        // Fill the four rounded corners of each coated sheet. Flat webs alone
+        // would leave a triangular void between the curved oxide and the metal.
+        for (const y of ribbonY)
+          for (const vertical of [-1, 1]) {
+            box(
+              0,
+              y + vertical * 0.092,
+              side * 0.637,
+              0.801,
+              0.048 * gate,
+              0.074 * gate,
+              color.alloy,
+              0.009,
+              0,
+              0.91,
+            );
+          }
       }
-      if (first && section > 0.005) {
+      if (first && section > 0.005 && gate > 0.005) {
         // A polished cut has one continuous metal face around all four holes.
         // Cover the modelling seams between the common metal walls and webs.
         for (const y of [0.293, 0.7, 1.12, 1.54, 1.947])
@@ -205,21 +248,75 @@
           box(0.403, 1.12, z, 0.012, 1.855, 0.166 * section, color.alloy, 0.001, 0, 0.91);
       }
       if (first && fab > 0.001) {
-        const depth = 1.16 * fab * (1 - removeGe);
-        for (const y of [0.7, 1.12, 1.54])
-          box(0, y, 0, 3.96, 0.241 * Math.sqrt(1 - removeGe), depth, color.siliconGe, 0.025, 0, 0.52);
+        const pocket = ease(2.76, 2.8, p);
+        const innerEdge = 0.416;
+        const geHalf = mix(sheetEnd, innerEdge, pocket);
+        // Outside the gate the stack has already been recessed and bounded by
+        // inner spacers. Only the material remaining inside this window is
+        // selectively etched from its accessible sidewalls.
+        for (const y of [0.28, 0.7, 1.12, 1.54]) {
+          box(
+            0,
+            y,
+            0,
+            2 * geHalf,
+            0.274 * fab,
+            (1.2 + extraWidth) * fab * (1 - removeGe),
+            color.siliconGe,
+            0.018,
+            0,
+            0.48,
+          );
+        }
+        // Wafer below the as-grown stack supports its basal sacrificial layer.
+        // Once recessed and anchored the cutaway omits this lower support.
+        const pedestal = interval(2.48, 2.64, 2.85, 2.94, p);
+        box(0, 0.03, 0, 4.35 * pedestal, 0.226 * pedestal, 1.38 + extraWidth, color.substrate, 0.035);
       }
-      const anchored = first ? 1 - interval(2.46, 2.64, 2.73, 2.86, p) : 1;
+      // These insulating plugs remain between gate and S/D in the finished
+      // device. The end-on cut removes the pieces in front of the slice.
+      const spacer = first ? (1 - interval(2.42, 2.64, 2.8, 2.84, p)) * (1 - section) : 1;
+      for (const side of [-1, 1]) {
+        for (const y of [0.28, 0.7, 1.12, 1.54]) {
+          box(
+            side * 0.506,
+            y,
+            0,
+            0.18 * spacer,
+            0.272 * spacer,
+            1.2 * spacer,
+            color.dielectric,
+            0.017,
+            0,
+            0.38,
+          );
+        }
+      }
+      const anchored = first ? 1 - interval(2.46, 2.64, 2.83, 2.87, p) : 1;
       const ends = (1 - 0.9999 * section) * appear * anchored;
+      const contact = (first ? 1 - interval(2.43, 2.63, 3.36, 3.49, p) : ease(3.36, 3.49, p)) * ends;
       for (const end of cellEnds) {
-        box(end, 1.12, 0, 0.48 * ends, 1.89 * ends, 1.49 * ends, color.terminal, 0.145, 0, 0.82);
-        box(end, 2.07, 0, 0.41 * ends, 0.09 * ends, 0.83 * ends, color.alloy, 0.023);
+        const inner = mix(1.98, 0.585, recess),
+          outer = 2.46;
+        box(
+          (Math.sign(end) * (inner + outer)) / 2,
+          1.12,
+          0,
+          (outer - inner) * ends,
+          1.89 * ends,
+          1.49 * ends,
+          color.terminal,
+          0.1,
+          0,
+          0.82,
+        );
+        box(end, 2.07, 0, 0.41 * contact, 0.09 * contact, 0.83 * contact, color.alloy, 0.023);
       }
       const gx = origin,
         gz = zOrigin;
       const gateY = 0.12 + 2.024 * scale;
       const localTop = 0.12 + 2.26 * scale;
-      const enabled = externals * appear;
+      const enabled = frontWiring * appear;
       if (enabled > 0.001) {
         const y1 = 0.12 + 2.32 * scale + signalRise;
         part(
@@ -257,11 +354,12 @@
       }
       const sx = origin + (right ? 2.22 : -2.22) * scale,
         vz = zOrigin - 0.95 * scale;
-      const via = first ? 1 - ease(0.12, 0.68, p) + ease(3.43, 3.6, p) : appear;
-      if (via > 0.0005) {
+      const via = (overview + ease(3.49, 3.6, p)) * appear;
+      const localContact = (overview + ease(3.42, 3.49, p)) * appear;
+      if (localContact > 0.0005) {
         // The nTSV meets the source/drain *contact* from the side.
         // Its device-side portion exists before bonding and backside reveal.
-        const bottom = -0.22;
+        const bottom = mix(localTop, -0.22, via);
         part(
           sx,
           (localTop + bottom) / 2,
@@ -277,9 +375,9 @@
           sx,
           localTop,
           zOrigin - 0.46 * scale,
-          0.33 * scale * via,
-          0.105 * scale,
-          0.99 * scale * via,
+          0.33 * scale * localContact,
+          0.105 * scale * localContact,
+          0.99 * scale * localContact,
           network,
           0.035 * scale,
           0.12 + trace * 0.32,
@@ -289,8 +387,8 @@
           sx,
           localTop - h * 0.5,
           zOrigin,
-          0.29 * scale * via,
-          h * via,
+          0.29 * scale * localContact,
+          h * localContact,
           0.43 * scale,
           network,
           0.04 * scale,
@@ -305,7 +403,7 @@
 
     // The original substrate thins from the backside, stopping just before
     // the preformed via ends. The bonded frontside support remains present.
-    const original = interval(3.34, 3.65, 4.03, 4.32, p);
+    const original = interval(3.32, 3.52, 4.1, 4.36, p);
     const baseH = (0.18 + 1.28 * original) * externals;
     const cutaway = ease(4.54, 5.01, p) * (1 - 0.47 * ease(6.61, 7, p));
     const baseZ = 1.18 * cutaway;
@@ -363,7 +461,7 @@
       0.55,
     );
     // Pattern the frontside signal plane. Isolated traces remain separated.
-    const fine = externals * (0.58 + 0.42 * carrier);
+    const fine = frontWiring;
     for (let row = 0; row < 8; row++) {
       const z = (row < 4 ? -1 : 1) * (1.05 + (row % 4) * 0.18);
       const stagger = (row % 2) * 0.3;
@@ -400,19 +498,23 @@
         ["共用金属栅", [0.404, 1.66, 0.735]],
         ["硅带沟道", [cut, 1.03, -0.34]],
       ];
+    } else if (p >= 2.845 && p < 3.09) {
+      anchors = [["内间隔层", [0.506, 1.24, 0.59]]];
+      if (p < 3.045) anchors.push(["硅锗夹层", [0, 0.82, 0.6 * (1 - removeGe)]]);
+    } else if (p >= 3.82 && p < 4.37) {
+      anchors = [
+        ["支撑晶圆", [2.5, capY + carrierH, -1.2]],
+        p < 4.33 ? ["原硅衬底", [-2.15, 0.05 - baseH, -1.2]] : ["露出的孔端", [va.x, -0.22, va.z]],
+      ];
     }
     if (backside > 0.0005) {
       const upper = -0.31 - 0.72 * expand,
         lower = upper - 0.23 - 0.63 * expand;
       const upperH = 0.134 * backside,
-        lowerH = 0.157 * backside;
+        lowerH = 0.157 * outsideRails;
       const railZ = [-1.47, -0.49, 0.49, 1.47];
-      const blue = power;
       const inactive = (rgb, level) => rgb.map((ch, i) => mix(ch, [0.23, 0.27, 0.31][i], trace * level));
-      const groundTint = inactive(
-        color.supply.map((ch, i) => mix(ch, color.ground[i], blue)),
-        0.8,
-      );
+      const groundTint = inactive(color.ground, 0.8);
       for (let j = 0; j < 4; j++) {
         const c = j === 0 ? color.supply : j === 2 ? inactive(color.supply, 0.87) : groundTint;
         const z = railZ[j];
@@ -420,9 +522,9 @@
           0,
           lower,
           z,
-          6.6 * backside,
+          6.6 * outsideRails,
           lowerH,
-          0.4 * backside,
+          0.4 * outsideRails,
           c,
           0.043,
           0.04 + (j === 0 ? trace * 0.23 : 0),
@@ -431,17 +533,27 @@
           part(
             0,
             lower - lowerH * 0.5,
-            z + side * 0.138 * backside,
-            6.43 * backside,
-            0.009 * backside,
-            0.016 * backside,
+            z + side * 0.138 * outsideRails,
+            6.43 * outsideRails,
+            0.009 * outsideRails,
+            0.016 * outsideRails,
             c,
             0.004,
             0.12,
           );
         for (const k of [-1, 1]) {
           const ex = k * 2.56 + (j % 2) * 0.15;
-          part(ex, lower - 0.115, z, 0.31 * backside, 0.115 * backside, 0.29 * backside, c, 0.04, 0.03);
+          part(
+            ex,
+            lower - 0.115,
+            z,
+            0.31 * outsideRails,
+            0.115 * outsideRails,
+            0.29 * outsideRails,
+            c,
+            0.04,
+            0.03,
+          );
         }
       }
       const rails = [
@@ -467,7 +579,17 @@
         );
         for (let j = pol; j < 4; j += 2) {
           const span = upper - lower;
-          part(x, (upper + lower) / 2, railZ[j], 0.15 * backside, span, 0.15 * backside, c, 0.05, 0.05);
+          part(
+            x,
+            upper - (span * interlevelVias) / 2,
+            railZ[j],
+            0.15 * interlevelVias,
+            span * interlevelVias,
+            0.15 * interlevelVias,
+            c,
+            0.05,
+            0.05,
+          );
         }
       }
       for (const [via, c] of [
@@ -543,7 +665,7 @@
         }
       }
     }
-    return { roll: PI * ease(3.76, 4.08, p), cam: camera(p), anchors };
+    return { roll: PI * ease(3.8, 4.1, p), cam: camera(p), anchors };
   }
 
   function bevelMesh() {

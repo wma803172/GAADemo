@@ -1,0 +1,402 @@
+.compare-section {
+  border-top: 1px solid #30403e;
+  background: linear-gradient(145deg, #101a1d, #0b1013 48%, #141819);
+  scroll-margin-top: var(--nav-height);
+}
+.compare-inner {
+  width: min(1160px, calc(100% - 2 * var(--gutter)));
+  margin: auto;
+  padding: clamp(52px, 6vw, 100px) 0;
+}
+.compare-heading h2,
+.explanation h3,
+.measurement h3 {
+  margin: 0;
+  color: #f0f2ed;
+  letter-spacing: -0.055em;
+  line-height: 1.23;
+}
+.compare-heading h2 {
+  font-size: clamp(30px, 3.8vw, 64px);
+  text-wrap: balance;
+}
+.compare-heading .topic,
+.measurement .topic {
+  margin: 0 0 12px;
+}
+.explanation,
+.measurement {
+  scroll-margin-top: calc(var(--nav-height) + 12px);
+  margin-top: clamp(34px, 4.5vw, 75px);
+  border-top: 1px solid #3c4849;
+  padding-top: clamp(28px, 3vw, 52px);
+}
+.explanation {
+  display: grid;
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(22px, 6vw, 85px);
+}
+.explanation h3,
+.measurement h3 {
+  font-size: clamp(24px, 2.5vw, 42px);
+  text-wrap: balance;
+}
+.explanation p,
+.measurement p:not(.topic) {
+  line-height: 1.78;
+  color: #bac6c4;
+  font-size: clamp(15px, 1.12vw, 18px);
+  margin: 12px 0 0;
+  max-width: 44em;
+}
+.explanation figure {
+  margin: 0;
+  background: linear-gradient(150deg, #202d31, #10191c);
+  border: 1px solid #354348;
+  border-radius: 12px;
+  padding: clamp(14px, 2vw, 27px);
+}
+.explanation svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.explanation figcaption {
+  color: #a8b9b7;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.design-choice {
+  display: inline-flex;
+  margin-top: 18px;
+  padding: 3px;
+  gap: 3px;
+  background: #0b1214;
+  border: 1px solid #42524f;
+  border-radius: 24px;
+}
+.design-choice button {
+  font: 540 13px/1.25 var(--sans);
+  background: transparent;
+  border: 0;
+  border-radius: 24px;
+  color: #abbab5;
+  padding: 9px 15px;
+  cursor: pointer;
+  min-height: 38px;
+}
+.design-choice button:hover {
+  color: #fff;
+}
+.design-choice button[aria-pressed="true"] {
+  background: #b2dcca;
+  color: #152b23;
+}
+.design-choice button:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+.gate-pair,
+.wiring-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 15px;
+}
+.cross-view,
+.wiring-pair > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+}
+.cross-view strong,
+.wiring-pair strong {
+  font-size: clamp(13px, 1.25vw, 17px);
+  font-weight: 560;
+  color: #eff2ef;
+}
+.cross-view > span,
+.wiring-pair span {
+  color: #d5e2dd;
+  font-size: 12px;
+  text-align: center;
+}
+.cross-view svg,
+.wiring-pair svg {
+  max-width: 205px;
+  margin: 8px auto;
+}
+.fin-gate {
+  fill: none;
+  stroke: #b4c3cb;
+  stroke-width: 19px;
+  stroke-linejoin: round;
+}
+.fin-dielectric {
+  fill: none;
+  stroke: #a2ebde;
+  stroke-width: 6px;
+  stroke-linejoin: round;
+}
+.silicon-shape {
+  fill: #ffab53;
+}
+.common-gate {
+  fill: #9caeb9;
+}
+.base-line {
+  stroke: #6c7e83;
+  stroke-width: 4px;
+}
+.drawn-sheets {
+  transform-origin: 95px 73px;
+  transform: scaleX(0.68);
+  transition: transform 0.38s ease;
+}
+.gate-pair[data-geometry="wide"] .drawn-sheets {
+  transform: scaleX(1.16);
+}
+.gate-pair figcaption,
+.wire-compare figcaption,
+.logic-diagram figcaption {
+  padding-top: 12px;
+  margin-top: 4px;
+  border-top: 1px solid #49565a70;
+}
+.gate-pair figcaption {
+  grid-column: 1/-1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+.gate-pair figcaption i {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ffab53;
+}
+.gate-pair figcaption i:nth-of-type(2) {
+  background: #a2ebde;
+  margin-left: 13px;
+}
+.gate-pair figcaption i:nth-of-type(3) {
+  background: #b4c3cb;
+  margin-left: 13px;
+}
+.front-routes {
+  fill: none;
+  stroke: #57b5a8;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+}
+.wire-bed {
+  fill: none;
+  stroke: #94a3aa;
+  stroke-width: 6;
+}
+.supply-route,
+.back-trunk {
+  fill: none;
+  stroke: #ffc36d;
+  stroke-width: 4;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.back-trunk {
+  stroke: #b9884b;
+  stroke-width: 8;
+}
+.wire-contact {
+  fill: #ffe3a1;
+  stroke: #6c4a23;
+  stroke-width: 1.5;
+}
+.wire-compare figcaption,
+.logic-diagram figcaption {
+  text-align: center;
+}
+.wire-compare figcaption {
+  margin-top: 16px;
+}
+.logic-diagram svg {
+  max-width: 380px;
+  max-height: 220px;
+  margin: 0 auto;
+}
+.logic-diagram text {
+  font: 13px var(--sans);
+  fill: #d2dcd9;
+}
+.logic-diagram .supply-text,
+.logic-diagram .return-text {
+  text-anchor: middle;
+  font: 600 12px var(--mono);
+}
+.logic-diagram .supply-text {
+  fill: #ffc47d;
+}
+.logic-diagram .return-text {
+  fill: #aab7ff;
+}
+.logic-diagram .input-text {
+  fill: #8adfd2;
+}
+.logic-diagram .device-name {
+  fill: #adc0c5;
+  font: 11px var(--mono);
+}
+.logic-wiring,
+.upper-switch,
+.lower-switch {
+  stroke: #a6b1b4;
+  stroke-width: 2.6;
+  fill: none;
+  stroke-linecap: round;
+}
+.input-guide {
+  stroke: #64bdad;
+  fill: none;
+  stroke-width: 1.8;
+}
+.contact-dots {
+  fill: #bdc6c7;
+}
+.upper-switch,
+.lower-switch {
+  transition:
+    transform 0.24s ease,
+    stroke 0.24s;
+  stroke-width: 3.8;
+}
+.upper-switch {
+  transform-origin: 166px 72px;
+}
+.lower-switch {
+  transform-origin: 166px 125px;
+}
+.logic-diagram[data-level="0"] .upper-switch {
+  stroke: #ffc477;
+}
+.logic-diagram[data-level="0"] .lower-switch,
+.logic-diagram[data-level="1"] .upper-switch {
+  transform: rotate(-32deg);
+}
+.logic-diagram[data-level="1"] .lower-switch {
+  stroke: #9daeff;
+}
+.logic-diagram[data-level="0"] .output-text {
+  fill: #ffc477;
+}
+.logic-diagram[data-level="1"] .output-text {
+  fill: #aab7ff;
+}
+.measurement {
+  display: grid;
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1fr);
+  gap: 12px clamp(22px, 6vw, 85px);
+  align-items: start;
+}
+.measurement table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+}
+.measurement caption {
+  caption-side: top;
+  text-align: left;
+  color: #aebfbc;
+  margin: 0 0 11px;
+  font-size: 12px;
+}
+.measurement th,
+.measurement td {
+  padding: 12px 4px;
+  border-bottom: 1px solid #43504d;
+  font-size: 14px;
+}
+.measurement thead th {
+  color: #c4cdca;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+.measurement tbody th {
+  font-family: var(--mono);
+  font-weight: 500;
+}
+.measurement td {
+  color: var(--cyan);
+  font-size: clamp(16px, 1.65vw, 25px);
+  font-weight: 580;
+  white-space: nowrap;
+}
+.measurement .measure-note {
+  grid-column: 2;
+  font-size: 12px !important;
+  color: #a0ada9 !important;
+  margin: 0 !important;
+}
+@media (max-width: 760px) {
+  .compare-inner {
+    padding: 46px 0 35px;
+  }
+  .explanation,
+  .measurement {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+  .explanation figure {
+    padding: 15px 12px;
+  }
+  .measurement .measure-note {
+    grid-column: 1;
+  }
+  .cross-view svg,
+  .wiring-pair svg {
+    max-height: 160px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .drawn-sheets,
+  .upper-switch,
+  .lower-switch {
+    transition: none;
+  }
+}
+.more-metrics {
+  margin-top: 26px;
+  border-top: 1px solid #354341;
+  padding-top: 16px;
+  color: #b7c8c3;
+  font-size: 14px;
+}
+.more-metrics summary {
+  cursor: pointer;
+  width: fit-content;
+  color: #d7e5de;
+}
+.more-metrics summary::marker {
+  color: var(--cyan);
+}
+.more-metrics summary:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 4px;
+}
+.more-metrics dl {
+  max-width: 80ch;
+  margin: 15px 0 0;
+}
+.more-metrics dt {
+  color: #d3e7dc;
+  font-weight: 600;
+  margin-top: 12px;
+}
+.more-metrics dd {
+  margin: 3px 0;
+  line-height: 1.75;
+}
