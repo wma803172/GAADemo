@@ -26,24 +26,34 @@ function activeSilicon(uniforms, layer) {
     );
     shader.fragmentShader = [
       'varying vec3 siliconPos;',
-      'uniform float carrierTime, conduction, drainField, layerPhase;',
+      'uniform float carrierTime, conduction, drainField, layerPhase, planarView, finView, gateHalf;',
       shader.fragmentShader,
-    ].join('\n').replace('#include <emissivemap_fragment>', `
+    ].join('\n').replace('#include <color_fragment>', `
+      #include <color_fragment>
+      // The two coloured diffusion regions meet the gate edges in the
+      // planar cutaway. Their inner edges mark the source/drain junctions.
+      float diffusion = smoothstep(gateHalf - 0.035, gateHalf + 0.035, abs(siliconPos.z));
+      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.23,0.34,0.40), planarView * diffusion);
+    `).replace('#include <emissivemap_fragment>', `
       #include <emissivemap_fragment>
       float z = siliconPos.z / ${RIBBON_L.toFixed(2)};
       float x = siliconPos.x / ${RIBBON_W.toFixed(2)};
       float y = siliconPos.y / ${RIBBON_T.toFixed(2)};
-      float phase = fract(z * 3.2 - carrierTime * 0.81 + layerPhase);
+      float gateZ = siliconPos.z / gateHalf;
+      float phase = fract(mix(z * 3.2, gateZ * 0.90, finView) - carrierTime * 0.81 + layerPhase);
       float head = 1.0 - smoothstep(0.025, 0.12, abs(phase - 0.58));
       float tail = smoothstep(0.14, 0.55, phase) * (1.0 - smoothstep(0.55, 0.59, phase));
       float top = 1.0 - smoothstep(0.018, 0.085, abs(abs(x) - 0.28));
       float side = (1.0 - smoothstep(0.045, 0.26, abs(y))) * smoothstep(0.43, 0.49, abs(x));
-      float path = max(top, side) * (1.0 - smoothstep(0.40, 0.48, abs(z)));
+      float ribbonPath = max(top, side) * (1.0 - smoothstep(0.40, 0.48, abs(z)));
+      float finPath = max(top * smoothstep(0.33, 0.46, y), side) *
+          (1.0 - smoothstep(0.88, 1.0, abs(gateZ)));
+      float path = mix(ribbonPath, finPath, finView);
       float gateRegion = 1.0 - smoothstep(0.07, 0.12, abs(z));
       totalEmissiveRadiance += vec3(1.0,0.65,0.24) * conduction * path *
           (0.13 + 2.0 * head + 0.43 * tail) * (1.0 + 0.34 * gateRegion);
-      totalEmissiveRadiance += vec3(0.72,0.12,0.035) * drainField *
-          smoothstep(-0.16, 0.25, z) * (1.0 - smoothstep(0.29,0.41,z));
+      totalEmissiveRadiance += vec3(0.95,0.16,0.035) * drainField *
+          smoothstep(-0.92, 0.83, gateZ) * (1.0 - smoothstep(1.0, 1.32, abs(gateZ)));
     `);
   };
   return mat;
@@ -173,7 +183,10 @@ export function buildGAA(opts = {}) {
   const { base, substrate, plinth, sti } = specimenBase(STI_TOP);
   root.add(base);
 
-  const uniforms = { carrierTime: { value: 0 }, conduction: { value: 0 }, drainField: { value: 0 } };
+  const uniforms = {
+    carrierTime: { value: 0 }, conduction: { value: 0 }, drainField: { value: 0 },
+    planarView: { value: 0 }, finView: { value: 0 }, gateHalf: { value: gateLen / 2 },
+  };
   const ribbons = [];
   // The silicon enters each terminal and ends inside it, away from the
   // outer contact face even when its edges taper.
@@ -200,6 +213,11 @@ export function buildGAA(opts = {}) {
     metrics: { cy, stackBottom, stackTop, gateLen, gateOuterW, gateOuterH, sdZ, RIBBON_W, RIBBON_T, RIBBON_L, pitch: PITCH, stiTop: STI_TOP },
     setGateCoverage: gate.setCoverage,
     setConduction(strength, time) { uniforms.conduction.value = strength; uniforms.carrierTime.value = time; },
+    setChannelView(planar, fin, gateHalf) {
+      uniforms.planarView.value = planar;
+      uniforms.finView.value = fin;
+      uniforms.gateHalf.value = gateHalf;
+    },
     setDrainField(strength) { uniforms.drainField.value = strength; },
   };
 }

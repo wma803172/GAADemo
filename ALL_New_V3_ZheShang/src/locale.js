@@ -3,7 +3,7 @@ import { CHAPTERS } from './content.js';
 export const COPY = {
   zh: {
     langTag: 'zh-CN', title: 'Intel 18A · 沟道与背面供电',
-    description: '从平面晶体管到 RibbonFET 的四层硅带，再沿 PowerVia 跟到芯片背面的电网。',
+    description: '从平面晶体管到 Panther Lake 的四层硅带，再沿 PowerVia 找到芯片背面的供电网络。',
     brand: '硅基之旅', navigation: '跳到展示段落', evolution: '器件演变',
     gate: '环绕栅', power: '背面供电', language: '展示语言',
     scroll: '向下滚动', modelNote: '结构示意 · 非等比例', loading: '正在装载晶圆…',
@@ -13,7 +13,7 @@ export const COPY = {
   },
   en: {
     langTag: 'en', title: 'Intel 18A · Channels and Backside Power',
-    description: 'Explore four stacked silicon ribbons, their common gate and the backside power network in Intel 18A.',
+    description: 'Explore the four stacked ribbons in a Panther Lake transistor and follow its PowerVia connection to the backside power grid.',
     brand: 'Silicon Atlas', navigation: 'Jump to a section', evolution: 'Device evolution',
     gate: 'Gate-all-around', power: 'Backside power', language: 'Display language',
     scroll: 'Scroll to explore', modelNote: 'Schematic · Not to scale', loading: 'Loading wafer…',
@@ -27,8 +27,8 @@ const english = {
   hero: {
     kickerCn: 'Transistor architecture',
     title: 'Four ribbons.<br><em>Two sides.</em>',
-    lead: 'In Intel 18A, one gate controls four silicon ribbons. Power reaches the transistors from the back of the chip.',
-    body: ['Scroll back in time to the first planar switches.'],
+    lead: 'On Panther Lake’s 18A compute tile, one gate controls four stacked silicon ribbons. Power comes in from the back of the chip.',
+    body: ['Scroll down to start with an early planar transistor.'],
   },
   planar: {
     kickerCn: 'Planar MOS transistor',
@@ -52,24 +52,24 @@ const english = {
     labels: {fin: ['Silicon fin', 'The upright channel']},
   },
   multifin: {
-    kicker: '2014 · MULTI-FIN FINFET', kickerCn: 'Parallel channels',
+    kicker: 'MULTI-FIN FINFET', kickerCn: 'Parallel channels',
     title: 'More fins,<br><em>side by side.</em>',
     lead: 'Several fins can connect the same source and drain. Each adds a parallel path for current, all controlled by one gate.',
-    body: ['Watch two fins become four. More fins usually let the switch drive a larger load, at the cost of more area.'],
+    body: ['Compare a two-fin design with a four-fin design. More fins usually let a switch drive a larger load, at the cost of more area.'],
     labels: {fin: ['Parallel fins', 'Each links source and drain']},
   },
   n3: {
     kickerCn: 'Fin count and cell area',
     title: 'How many fins<br><em>fit the job?</em>',
-    lead: 'TSMC N3 still uses fins. Its FINFLEX options include 3–2, 2–2 and 2–1 fin configurations, so designers can trade cell area for drive strength.',
-    body: ['Keep an eye on the vertical fins. In Intel’s RibbonFET, horizontal strips of silicon are stacked one above another.'],
+    lead: 'TSMC’s N3 FINFLEX options include 3–2, 2–2 and 2–1. The numbers count fins for the two transistor types in a cell, letting designers trade off performance and area.',
+    body: ['The model shows one transistor. Compare its upright fins with Intel’s stacked horizontal ribbons in the next view.'],
     labels: {fin: ['Fin beneath the gate', 'Joined to the substrate']},
   },
   gaa: {
     kickerCn: 'RibbonFET · Gate-all-around',
     title: 'Four ribbons.<br><em>One gate.</em>',
-    lead: 'Look through the gate. When the switch is on, light traces all four silicon paths from end to end. Switch it off to stop all four.',
-    body: ['In Panther Lake, each ribbon has a thin insulating layer around it. One metal gate surrounds all four and controls them with its electric field.'],
+    lead: 'When the switch is on, lights trace four paths between source and drain. Switch it off and the lights disappear. A real transistor can still pass a tiny leakage current.',
+    body: ['Look through this Panther Lake cutaway. The same metal gate wraps around each ribbon. Its electric field controls the channel across a thin insulating layer.'],
     labels: {gate: ['Common gate', 'Transparent cutaway']},
   },
   front: {
@@ -83,7 +83,7 @@ const english = {
     kicker: 'BACKSIDE POWER', kickerCn: 'Two layouts',
     title: 'Signals above.<br><em>Power below.</em>',
     lead: 'Use the devices as the dividing line. Signals run along the front. Two separate grids on the back distribute power and carry the return.',
-    body: ['Wider power lines reduce voltage loss. In selected routed designs, Intel reported about one tenth the worst-case dynamic voltage droop of frontside delivery.'],
+    body: ['Wider wires can reduce voltage loss. In Intel’s CPU core comparison, peak dynamic voltage droop on 18A with backside power was about one tenth of that on Intel 3 with frontside power.'],
     labels: {rail: ['Backside power rail', 'Feeds a local contact']},
   },
   powervia: {
@@ -96,7 +96,7 @@ const english = {
   via: {
     kickerCn: 'The local contact',
     title: 'Where the<br><em>power lands.</em>',
-    lead: 'The gold via meets a short side contact to one transistor’s source. The teal input reaches its gate from above. The blue return serves the neighboring device.',
+    lead: 'In this example, the gold via feeds one transistor’s source through a side contact. Its gate receives the teal frontside signal. The blue return connects to a neighboring device.',
     body: ['This is a close-up of the same grid. The moving lights trace the routes through metal already in place.'],
     labels: {sideContact: ['Side contact', 'To the source'], sigGate: ['Gate contact', 'Frontside input']},
   },

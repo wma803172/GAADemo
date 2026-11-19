@@ -11,14 +11,17 @@ import { lerp, srange } from '../core/util.js';
 // x, lower surface y, width, height. A zero width parks a spare lane below
 // the isolation. The intermediate poses compare structures across generations.
 const DORMANT = [0, 0.32, 0, 0];
-const PLANAR = [[0, 0.30, 2.75, 0.12], DORMANT, DORMANT, DORMANT];
-const ONE_FIN = [[0, 0.32, 0.41, 1.92], [0.72, 0.32, 0, 0], DORMANT, DORMANT];
-const TWO_FINS = [[-0.65, 0.32, 0.34, 2.02], [0.65, 0.32, 0.34, 2.02],
+// Silicon extends through the surrounding isolation and into the substrate.
+// The three-sided gate still stops at the top of the isolation.
+const bulkLane = (x, width, top) => [x, 0.02, width, top - 0.02];
+const PLANAR = [bulkLane(0, 2.75, 0.42), DORMANT, DORMANT, DORMANT];
+const ONE_FIN = [bulkLane(0, 0.41, 2.24), [0.72, 0.32, 0, 0], DORMANT, DORMANT];
+const TWO_FINS = [bulkLane(-0.65, 0.34, 2.34), bulkLane(0.65, 0.34, 2.34),
   [-1.62, 0.32, 0, 0], [1.62, 0.32, 0, 0]];
-const FOUR_FINS = [[-0.52, 0.32, 0.30, 2.02], [0.52, 0.32, 0.30, 2.02],
-  [-1.56, 0.32, 0.30, 2.02], [1.56, 0.32, 0.30, 2.02]];
-const THREE_FINS = [[-0.91, 0.32, 0.29, 2.18], [0.91, 0.32, 0.29, 2.18],
-  [0, 0.32, 0.29, 2.18], [1.62, 0.32, 0, 0]];
+const FOUR_FINS = [bulkLane(-0.52, 0.30, 2.34), bulkLane(0.52, 0.30, 2.34),
+  bulkLane(-1.56, 0.30, 2.34), bulkLane(1.56, 0.30, 2.34)];
+const THREE_FINS = [bulkLane(-0.91, 0.29, 2.50), bulkLane(0.91, 0.29, 2.50),
+  bulkLane(0, 0.29, 2.50), [1.62, 0.32, 0, 0]];
 
 function buildFinGate(root) {
   const group = new THREE.Group();
@@ -131,6 +134,11 @@ export function buildDeviceEvolution() {
     const [start, a] = poses[j - 1];
     const [end, b] = poses[j];
     const t = srange(p, start, end);
+    const fin = srange(p, 0.181, 0.231);
+    const shorten = srange(p, 0.132, 0.181) * (1 - fin);
+    const halfReduction = 0.44 * shorten;
+    const gateLen = lerp(1.72 - 2 * halfReduction, m.gateLen, fin);
+    const lengthScale = 1 - halfReduction / (m.RIBBON_L / 2 - 0.11);
     let highest = 0, span = 0;
     for (let i = 0; i < lanes.length; i++) {
       const lane = lanes[i];
@@ -141,7 +149,7 @@ export function buildDeviceEvolution() {
       const mesh = parts.ribbons[i];
       mesh.visible = lane.width > 0.012 && lane.height > 0.018;
       if (!mesh.visible) continue;
-      mesh.scale.set(lane.width / m.RIBBON_W, lane.height / m.RIBBON_T, 1);
+      mesh.scale.set(lane.width / m.RIBBON_W, lane.height / m.RIBBON_T, lengthScale);
       mesh.position.set(lane.x, lane.bottom + lane.height / 2, 0);
       highest = Math.max(highest, lane.bottom + lane.height);
       span = Math.max(span, Math.abs(lane.x) * 2 + lane.width);
@@ -153,33 +161,34 @@ export function buildDeviceEvolution() {
     revealWiring(portrait);
     device.setGateCoverage(portrait);
     const wrap = Math.max(1 - srange(p,0.024,0.040), srange(p, 0.461, 0.477));
-    const fin = srange(p, 0.181, 0.231);
-    const shorten = srange(p, 0.132, 0.181) * (1 - fin);
-    const gateLen = lerp(1.72 - 0.88 * shorten, m.gateLen, fin);
     finGate.update(lanes, gateLen, fin, srange(p, 0.438, 0.468), (1 - wrap) * visibility);
     fadeGate(wrap * visibility);
 
-    // Only thickness and width change. Source and drain retain the same
-    // centreline and longitudinal position from the first to the last frame.
+    // The metal contacts follow the two diffusion regions toward the centre
+    // during planar scaling. Source and drain retain their screen order.
     const terminalPose = Math.max(intro,wrap);
     const h = lerp(Math.max(highest - m.stiTop + 0.23, 0.27), terminalHeight, terminalPose);
     const centreY = lerp(m.stiTop + h / 2 - 0.09, m.cy, terminalPose);
     const widthScale = lerp((span + 0.62) / (m.RIBBON_W + 0.35), 1, terminalPose);
     for (const end of parts.terminals) {
       end.position.y = centreY;
+      end.position.z = Math.sign(end.position.z) * (m.sdZ - halfReduction);
       end.scale.set(widthScale, h / terminalHeight, 1);
     }
     const guide = lanes[0];
     const upper = guide.bottom + guide.height;
     anchors.gate.position.set(0, lerp(highest + 0.28, m.cy + m.gateOuterH / 2, wrap), 0);
     anchors.fin.position.set(guide.x, upper, 1.05);
-    anchors.channel.position.set(guide.x + guide.width * 0.38, upper, 1.25);
+    anchors.channel.position.set(guide.x + guide.width * 0.38, upper, gateLen * 0.22);
     anchors.ribbon.position.set(m.RIBBON_W / 2, m.stackBottom + 3 * m.pitch, 1.02);
     anchors.flow.position.set(guide.x + guide.width * 0.27, upper, 0.18);
     anchors.oxide.position.set(guide.x + guide.width * 0.48, upper + 0.045, gateLen * 0.50);
     const field = shorten * (1 - srange(p, 0.178, 0.212));
     device.setDrainField(field);
-    device.setConduction(Math.max(1 - srange(p,0.022,0.035),gateOn ? srange(p, 0.465, 0.479) : 0), time);
+    const finFlow = fin * (1 - srange(p, 0.432, 0.462));
+    const planarView = (1 - intro) * (1 - fin);
+    device.setChannelView(planarView, finFlow, gateLen / (2 * lengthScale));
+    device.setConduction(Math.max(finFlow, gateOn ? srange(p, 0.465, 0.479) : 0), time);
   }
   return { ...device, kind: 'device', apply };
 }

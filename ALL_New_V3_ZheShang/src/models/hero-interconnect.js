@@ -53,10 +53,10 @@ export function buildHeroInterconnect(device) {
     }
   }
   track('backViaLanding',viaX,fineY,zSource,0.38,0.13,0.36);
-  plug('heroSupplyVia',viaX,fineY,capY,zSource,0.106,0.084);
+  plug('heroSupplyVia',viaX,fineY,capY,zSource,0.084,0.106);
   // A cutaway in the insulating sleeve reveals the metal core in the
   // exposed section; the rest of the via continues behind the silicon.
-  const linerGeo = new THREE.CylinderGeometry(0.119,0.144,capY-fineY-0.064,48,1,true,
+  const linerGeo = new THREE.CylinderGeometry(0.144,0.119,capY-fineY-0.064,48,1,true,
     Math.PI*0.54,Math.PI*1.38);
   const sleeve = new THREE.Mesh(linerGeo,oxide);
   sleeve.name = 'supplyDielectric';
