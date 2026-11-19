@@ -128,6 +128,11 @@ export const languages = {
     description: '沿着晶体管七十年的变形记，从平面到 FinFET，从 3nm 到 RibbonFET，再翻到芯片背面看 PowerVia 供电。',
     brand: '硅基之旅', switcher: '展示语言', scroll: '向下滚动', loading: '正在装载晶圆…',
     scale: '非等比例', quality: '画质', levels: ['高', '中', '低'], full: '全屏', exitFull: '退出全屏',
+    flow: {
+      legend: '沟道光纹', group: '光纹显示方式', current: '常规电流', electrons: '电子',
+      currentDirection: '漏极 D → 源极 S', electronsDirection: '源极 S → 漏极 D',
+      bias: 'nMOS 示意 · 漏极电压高于源极', history: '1971 年的 Intel 4004 采用 pMOS。',
+    },
   },
   en: {
     lang: 'en', chapters: englishChapters,
@@ -135,6 +140,11 @@ export const languages = {
     description: 'Follow seventy years of transistor design, from planar devices and FinFETs to 3 nm and RibbonFET. Turn the chip over to see how PowerVia delivers power.',
     brand: 'A silicon journey', switcher: 'Display language', scroll: 'Scroll down', loading: 'Loading the wafer…',
     scale: 'Not to scale', quality: 'Graphics quality', levels: ['High', 'Medium', 'Low'], full: 'Full screen', exitFull: 'Exit full screen',
+    flow: {
+      legend: 'Channel traces', group: 'What the traces show', current: 'Conventional current', electrons: 'Electrons',
+      currentDirection: 'Drain D → Source S', electronsDirection: 'Source S → Drain D',
+      bias: 'nMOS example · Drain voltage is higher than source voltage.', history: 'The 1971 Intel 4004 used pMOS.',
+    },
   },
 };
 

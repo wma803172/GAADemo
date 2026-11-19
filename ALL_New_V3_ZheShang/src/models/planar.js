@@ -12,6 +12,9 @@ export function buildPlanar() {
   const root = new THREE.Group();
   const parts = {};
   const anchors = {};
+  const gateLength = 2.35;
+  // Schematic overlap of the gate with the doped silicon on each side.
+  const channelLength = gateLength - 2 * 0.065;
 
   /* ---- 底座 + 衬底 -------------------------------------------------- */
   const plinth = new THREE.Mesh(cutBlock(12.2, 0.55, 8.2, 0.27, 0.10), silicon({ color: 0x1c2831, roughness: 0.46 }));
@@ -54,6 +57,17 @@ export function buildPlanar() {
   parts.source = sL;
   parts.drain = sR;
 
+  // The shallow doped extensions meet the channel under the gate edges.
+  // Their outer ends stay buried under the raised contacts during scaling.
+  // A slight recess keeps the side faces clear of the overlapping contact body.
+  const extensionGeometry = new THREE.BoxGeometry(1, 0.20, 3.88);
+  const sourceExtension = new THREE.Mesh(extensionGeometry, sdMat);
+  const drainExtension = new THREE.Mesh(extensionGeometry, sdMat);
+  sourceExtension.position.y = drainExtension.position.y = 0.14;
+  root.add(sourceExtension, drainExtension);
+  parts.sourceExtension = sourceExtension;
+  parts.drainExtension = drainExtension;
+
   // 源漏上的接触条：三条细金属，暗示上面还要接线
   const barMat = surfaceMetal(0xcfab72, 0.29);
   const barrier = surfaceMetal(0x7e7460, 0.45);
@@ -71,13 +85,13 @@ export function buildPlanar() {
 
 
   /* ---- 沟道 -------------------------------------------------------- */
-  const ch = new THREE.Mesh(rbox(3.0, 0.20, 3.9, 0.04, 2), channel({ color: 0x2a3c50 }));
+  const ch = new THREE.Mesh(rbox(channelLength, 0.20, 3.9, 0.025, 2), channel({ color: 0x2a3c50 }));
   ch.position.y = 0.14;
   root.add(ch);
   parts.channel = ch;
 
   // 沟道里流动的载流子
-  const flow = new THREE.Mesh(rbox(3.0, 0.21, 3.9, 0.03, 1), energyFlow({ color: 0x63e6ff, density: 2.2, speed: 0.9, opacity: 0.55 }));
+  const flow = new THREE.Mesh(rbox(channelLength, 0.21, 3.9, 0.03, 1), energyFlow({ color: 0x63e6ff, density: 2.2, speed: 0.9, opacity: 0.55 }));
   flow.position.y = 0.145;
   flow.visible = false;
   root.add(flow);
@@ -92,11 +106,11 @@ export function buildPlanar() {
 
   /* ---- 栅极（半透明） ------------------------------------------------ */
   const gate = new THREE.Group();
-  const gateBody = new THREE.Mesh(cutBlock(2.35,0.62,4.3,0.11,0.047),cutawayGate(0xb5e6ef,0.25));
+  const gateBody = new THREE.Mesh(cutBlock(gateLength,0.62,4.3,0.11,0.047),cutawayGate(0xb5e6ef,0.25));
   gateBody.position.y = 0.60;
   gate.add(gateBody);
 
-  const gateShell = new THREE.Mesh(rbox(2.35, 0.62, 4.3, 0.05, 3), rim(0x7fe9ff, { power: 2.2, strength: 1.05 }));
+  const gateShell = new THREE.Mesh(rbox(gateLength, 0.62, 4.3, 0.05, 3), rim(0x7fe9ff, { power: 2.2, strength: 1.05 }));
   gateShell.position.y = 0.60;
   gateShell.scale.setScalar(1.012);
   gate.add(gateShell);
@@ -116,7 +130,7 @@ export function buildPlanar() {
       rbox(0.16, 0.66, 4.34, 0.02, 1),
       cutawayGate(0x86aabb,0.37)
     );
-    sp.position.set(sx * (2.35 / 2 + 0.08), 0.60, 0);
+    sp.position.set(sx * (gateLength / 2 + 0.08), 0.60, 0);
     gate.add(sp);
   }
 
@@ -124,17 +138,15 @@ export function buildPlanar() {
   parts.gate = gate;
   parts.gateBody = gateBody;
 
-  /* ---- 短沟道效应：受控区 与 失控区 --------------------------------------
-     栅极正下方是栅极还管得住的范围（青）；栅极到漏极之间那一截，
-     漏极的电场自己伸手进来控制（红）。栅长越短，红的那段越长。 */
-  const gradTex = (inner, outer) => {
+  /* ---- 栅下沟道和从漏端伸入沟道的电场影响（定性示意） --------------------- */
+  const gradTex = (left, center, right) => {
     const cv = document.createElement('canvas');
     cv.width = 128; cv.height = 4;
     const cx = cv.getContext('2d');
     const g = cx.createLinearGradient(0, 0, 128, 0);
-    g.addColorStop(0, outer);
-    g.addColorStop(0.5, inner);
-    g.addColorStop(1, outer);
+    g.addColorStop(0, left);
+    g.addColorStop(0.5, center);
+    g.addColorStop(1, right);
     cx.fillStyle = g;
     cx.fillRect(0, 0, 128, 4);
     const t = new THREE.CanvasTexture(cv);
@@ -156,8 +168,8 @@ export function buildPlanar() {
     return m;
   };
 
-  const ctrlZone = mkZone(gradTex('rgba(110,235,255,0.55)', 'rgba(110,235,255,0.06)'));
-  const leakZone = mkZone(gradTex('rgba(255,120,90,0.75)', 'rgba(255,90,60,0.05)'));
+  const ctrlZone = mkZone(gradTex('rgba(110,235,255,0.06)', 'rgba(110,235,255,0.55)', 'rgba(110,235,255,0.06)'));
+  const leakZone = mkZone(gradTex('rgba(255,90,60,0)', 'rgba(255,106,79,0.45)', 'rgba(255,140,95,0.90)'));
   parts.ctrlZone = ctrlZone;
   parts.leakZone = leakZone;
 
@@ -165,14 +177,24 @@ export function buildPlanar() {
   anchors.gate = anchor(gate, 0, 0.93, -1.30, 'gate');
   anchors.source = anchor(sL, -0.43, 0.15, 0.42, 'source');
   anchors.drain = anchor(sR, 0.43, 0.15, 0.42, 'drain');
-  anchors.channel = anchor(ch, 1.38, 0.10, 1.12, 'channel');
+  anchors.channel = anchor(ch, 0.82 * channelLength / 2, 0.10, 1.12, 'channel');
   anchors.silicon = anchor(sub, -4.6, 0.2, 3.1, 'silicon');
   anchors.oxide = anchor(top, 3.6, 0.1, 3.1, 'oxide');
 
   const fade = makeFade(root);
+  function setGateScale(scale) {
+    gate.scale.x = gox.scale.x = ch.scale.x = flow.scale.x = scale;
+    const innerEdge = channelLength * scale / 2;
+    const outerEdge = 1.72;
+    const extensionWidth = outerEdge - innerEdge;
+    sourceExtension.scale.x = drainExtension.scale.x = extensionWidth;
+    drainExtension.position.x = innerEdge + extensionWidth / 2;
+    sourceExtension.position.x = -drainExtension.position.x;
+  }
+  setGateScale(1);
 
   return {
-    root, parts, anchors, fade,
+    root, parts, anchors, fade, setGateScale, metrics: {gateLength, channelLength},
     kind: 'planar',
   };
 }

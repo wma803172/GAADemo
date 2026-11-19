@@ -10,7 +10,6 @@ import { buildGAA } from '../models/gaa.js';
 import { buildStack } from '../models/stack.js';
 import { anchor } from '../models/common.js';
 import { buildDie, buildPackage, buildServer, buildLaptop } from '../models/macro.js';
-import { energyFlow } from '../scene/materials.js';
 import { channelCurrent } from './channel-current.js';
 import { lerp, srange, win, ease } from '../core/util.js';
 import { chapterAt } from '../content.js';
@@ -68,14 +67,11 @@ export function createStage(scene) {
       dev.root.add(b);
       bores.push(b);
 
-      const fMat = energyFlow({
-        color: 0x8ff2ff, density: 1.6, speed: 1.8,
-        opacity: 0.9, rimOnly: 0.0, axis: [0, 1, 0],
+      // Light the completed metallic link. This view specifies connectivity,
+      // not a biased circuit with current flowing into both terminals.
+      const fMat = new THREE.MeshBasicMaterial({
+        color: 0x94dce7, transparent: true, depthWrite: false, depthTest: false,
       });
-      // This cylinder is horizontal once mounted. Sample its own axial
-      // coordinate so the trace runs from the bore to the contact after any drag.
-      fMat.vertexShader = fMat.vertexShader.replace('vW = wp.xyz;', 'vW = position;');
-      fMat.depthTest = false;
       const f = new THREE.Mesh(new THREE.CylinderGeometry(0.20, 0.20, 0.9, 12, 1, true), fMat);
       f.rotation.x = -dir * Math.PI / 2;
       f.position.set(0, m.cy, dir * (m.sdZ + 0.55));
@@ -147,6 +143,7 @@ export function createStage(scene) {
   /* ------------------------------------------------------------ apply */
   function apply(p, time, view) {
     current.clock.value = time;
+    const cur = chapterAt(p);
 
     // 每帧清零：所有旋转都从这里"重新算"，不累积
     for (const k in models) models[k].root.rotation.set(0, 0, 0);
@@ -184,29 +181,28 @@ export function createStage(scene) {
     /* ---------------- 平面晶体管 ---------------- */
     if (vPlanar > 0.001) {
       const sce = srange(p, 0.128, 0.196);
-      const g = models.planar.parts.gate;
-      g.scale.x = lerp(1, 0.42, sce);
-      current.planarGateScale.value = g.scale.x;
-      // 栅极压下去一点点，强调"更薄的板子"
-      g.position.y = lerp(0, -0.06, sce);
-      // 栅极覆盖的那一段 = 受控区；栅极到漏极之间 = 失控区（漏极电场接管）
-      const gateHalf = (2.35 / 2) * g.scale.x;
-      const chHalf = 1.5;
-      const ctrl = models.planar.parts.ctrlZone;
-      const leak = models.planar.parts.leakZone;
+      const planar = models.planar;
+      const scale = lerp(1, 0.42, sce);
+      planar.setGateScale(scale);
+      const channelWidth = planar.metrics.channelLength * scale;
+      const ctrl = planar.parts.ctrlZone;
+      const leak = planar.parts.leakZone;
       ctrl.visible = sce > 0.02;
       leak.visible = sce > 0.02;
-      ctrl.scale.x = gateHalf * 2;
-      ctrl.position.x = 0;
+      ctrl.scale.x = channelWidth;
       ctrl.material.opacity = sce * 0.26 * vPlanar;
-      const leakW = Math.max(chHalf - gateHalf, 0.05);
+      // In shorter devices the drain influences a larger fraction of the
+      // channel. The warm gradient fades toward the source, under the gate.
+      const leakW = channelWidth * lerp(0.18, 0.80, sce);
       leak.scale.x = leakW;
-      leak.position.x = gateHalf + leakW / 2;
+      leak.position.x = (channelWidth - leakW) / 2;
       leak.material.opacity = sce * 0.36 * vPlanar;
       // Strong-on conduction transitions to a much fainter short-channel
       // leakage cue. The warm drain-field overlay remains independent.
       const demonstration = srange(p, 0.050, 0.076);
       current.strength.planar.value = demonstration * lerp(1, 0.18, sce) * vPlanar;
+      // The preceding planar chapter already labels both terminals in full.
+      for (const marker of planar.parts.flowEnds) marker.visible = cur.chapter.id === 'sce';
       // 入场：整体轻微旋转 + 位置
       models.planar.root.rotation.y = lerp(-0.06, 0.02, srange(p, 0.05, 0.22));
     }
@@ -299,10 +295,10 @@ export function createStage(scene) {
           b.scale.y = Math.max(h, 0.001);
           b.position.y = -1.35 + h / 2;
         } else {
-          // 电流：孔打通之后才亮
+          // 接通后整段横接头亮起。
           const reachedContact = -1.35 + 3.4 * local >= m.cy - 0.15;
           b.visible = onV > 0.02 && reachedContact;
-          b.material.uniforms.uOpacity.value = onV * vVia;
+          b.material.opacity = onV * vVia * 0.84;
         }
       });
     }
@@ -329,7 +325,6 @@ export function createStage(scene) {
     /* ---------------- 相机 ----------------
        每一章前 74% 停在自己的机位上（只做极慢的推进），
        后 26% 平滑地移到下一章机位。这样"停住看"和"转场"是同一套代码。 */
-    const cur = chapterAt(p);
     const idx = Math.min(cur.index, SHOTS.length - 1);
     const u = cur.u;
     let from = SHOTS[idx];
@@ -368,5 +363,5 @@ export function createStage(scene) {
     return { cameraPos: _p, cameraTarget: _t, fov: lerp(from.fov, to.fov, k) };
   }
 
-  return { models, apply };
+  return { models, apply, setFlowMode: current.setFlowMode };
 }

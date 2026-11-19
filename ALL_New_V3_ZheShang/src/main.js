@@ -120,6 +120,39 @@ qBtn?.addEventListener('click', () => {
 });
 
 const languageSwitch = document.querySelector('.language-switch');
+const flowLegend = document.getElementById('flow-legend');
+const flowSwitch = flowLegend.querySelector('.flow-switch');
+const flowButtons = flowSwitch.querySelectorAll('button');
+const flowDirection = document.getElementById('flow-direction');
+const flowBias = document.getElementById('flow-bias');
+const flowHistory = document.getElementById('flow-history');
+const flowChapters = new Set(['planar', 'sce', 'finfet', 'multifin', 'n3', 'gaa']);
+let flowMode = 'current';
+
+function renderFlowLegend(chapter) {
+  flowLegend.hidden = !flowChapters.has(chapter);
+  if (flowLegend.hidden) return;
+  const words = copy.flow;
+  flowLegend.setAttribute('aria-label', words.legend);
+  flowSwitch.setAttribute('aria-label', words.group);
+  for (const button of flowButtons) {
+    button.textContent = words[button.dataset.flowMode];
+    button.setAttribute('aria-pressed', String(button.dataset.flowMode === flowMode));
+  }
+  flowDirection.textContent = flowMode === 'current' ? words.currentDirection : words.electronsDirection;
+  flowBias.textContent = words.bias;
+  flowHistory.hidden = chapter !== 'planar';
+  flowHistory.textContent = words.history;
+}
+
+flowSwitch.addEventListener('click', event => {
+  const next = event.target.closest('button')?.dataset.flowMode;
+  if (!next || next === flowMode) return;
+  flowMode = next;
+  stage.setFlowMode(next);
+  renderFlowLegend(chapterAt(p).chapter.id);
+});
+
 function updateControls() {
   qBtn.textContent = copy.levels[qIndex];
   qBtn.title = copy.quality;
@@ -140,6 +173,7 @@ function localizeControls() {
   for (const button of languageSwitch.querySelectorAll('[data-lang]')) {
     button.setAttribute('aria-pressed', String(button.dataset.lang === language));
   }
+  renderFlowLegend(chapterAt(p).chapter.id);
   updateControls();
 }
 localizeControls();
@@ -207,6 +241,7 @@ function render(now) {
   const ci = chapterAt(p).index;
   if (ci !== lastChapter) {
     lastChapter = ci;
+    renderFlowLegend(CHAPTERS[ci].id);
     labels.setChapter(copy.chapters[ci]);
     chapterCount.textContent = String(ci + 1).padStart(2, '0') + ' / ' + String(CHAPTERS.length).padStart(2, '0');
   }

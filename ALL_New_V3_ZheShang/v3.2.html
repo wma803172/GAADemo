@@ -50,6 +50,18 @@
   <div class="hud-rail" id="rail" aria-hidden="true"></div>
   <div class="label-layer" id="labels" aria-hidden="true"></div>
 
+  <aside id="flow-legend" class="flow-legend" aria-label="沟道光纹" hidden>
+    <div class="flow-legend-row">
+      <div class="flow-switch" role="group" aria-label="光纹显示方式">
+        <button type="button" data-flow-mode="current" aria-pressed="true">常规电流</button>
+        <button type="button" data-flow-mode="electrons" aria-pressed="false">电子</button>
+      </div>
+      <b id="flow-direction" aria-live="polite"></b>
+    </div>
+    <p id="flow-bias"></p>
+    <p id="flow-history" hidden></p>
+  </aside>
+
   <div class="scalebar" id="scalebar" aria-hidden="true">
     <div class="scalebar-track"><i id="scalebar-fill"></i></div>
     <span class="scalebar-label" id="scalebar-label">10 µm</span>
