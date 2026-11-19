@@ -1,24 +1,31 @@
 @echo off
+setlocal
 chcp 65001 >nul
-title Intel 18A - Silicon Atlas
+title Intel 18A
 cd /d "%~dp0"
-echo.
-echo   Intel 18A . 从一颗开关到一台电脑
-echo   ---------------------------------
-echo   本地预览地址: http://127.0.0.1:8123
-echo   关掉这个窗口即停止服务。
-echo.
-set NODE_EXE=node
+set "PAGE=http://localhost:8124/V4.html"
+curl.exe --noproxy "*" --fail --silent --max-time 1 "%PAGE%" >nul 2>nul && goto open
+set "NODE_EXE=node"
 where node >nul 2>nul
-if errorlevel 1 (
-  if exist "%LOCALAPPDATA%\Programs\nodejs\node.exe" (
-    set NODE_EXE=%LOCALAPPDATA%\Programs\nodejs\node.exe
-  ) else (
-    echo [x] 没有找到 Node.js。请先安装 https://nodejs.org 后再双击本文件。
-    pause
-    exit /b 1
-  )
+if errorlevel 1 set "NODE_EXE=%LOCALAPPDATA%\Programs\nodejs\node.exe"
+if not "%NODE_EXE%"=="node" if not exist "%NODE_EXE%" (
+  echo Install Node.js 18 or newer to launch the exhibit.
+  pause
+  exit /b 1
 )
-start "" cmd /c "timeout /t 2 >nul & start \"\" http://127.0.0.1:8123"
-%NODE_EXE% tools\serve.mjs . 8123
+start "" /b "%NODE_EXE%" tools\serve.mjs . 8124
+set "OWNS_SERVER=1"
+for /l %%N in (1,1,12) do (
+  curl.exe --noproxy "*" --fail --silent --max-time 1 "%PAGE%" >nul 2>nul && goto open
+  timeout /t 1 /nobreak >nul
+)
+echo Cannot open the exhibit on port 8124.
 pause
+exit /b 1
+
+:open
+start "" "%PAGE%"
+if defined OWNS_SERVER (
+  echo Keep this window open while viewing the exhibit.
+  pause >nul
+)

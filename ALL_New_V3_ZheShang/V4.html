@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#04070b" />
+<title>Intel 18A · 沟道与背面供电</title>
+<meta name="description" content="沿着晶体管七十年的变形记，从平面到 FinFET，从 3nm 到 RibbonFET，再翻到芯片背面看 PowerVia 供电。" />
+<link rel="icon" href="./assets/mark.svg" type="image/svg+xml" />
+<link rel="stylesheet" href="./src/styles.css" />
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three/three.module.js",
+    "three/addons/": "./vendor/three/addons/"
+  }
+}
+</script>
+</head>
+<body>
+<div id="app">
+  <canvas id="gl" aria-hidden="true"></canvas>
+  <div class="vignette" aria-hidden="true"></div>
+  <div class="grain" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">
+        <i></i><i></i><i></i><i></i>
+      </span>
+      <span class="brand-text"><b>Intel 18A</b><i data-copy="brand">硅基之旅</i></span>
+    </div>
+    <nav class="chapter-nav" aria-label="跳到展示段落" data-label="navigation">
+      <a href="?t=0.10" data-t="0.10" data-copy="evolution">器件演变</a>
+      <a href="?t=0.517" data-t="0.517" data-copy="gate">环绕栅</a>
+      <a href="?t=0.726" data-t="0.726" data-copy="power">背面供电</a>
+    </nav>
+    <div class="topbar-right">
+      <div class="language-switch" role="group" aria-label="展示语言" data-label="language">
+        <button type="button" data-lang="zh" lang="zh-CN" aria-label="中文" aria-pressed="true">中文</button>
+        <button type="button" data-lang="en" lang="en" aria-label="English" aria-pressed="false">EN</button>
+      </div>
+      <span class="chapter-count" id="chapter-count">01 / 15</span>
+      <button class="icon-btn" id="btn-quality" type="button" title="画质">高</button>
+      <button class="icon-btn" id="btn-full" type="button" title="全屏">
+        <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 6V2h4M14 10v4h-4M2 10v4h4M14 6V2h-4"/></svg>
+      </button>
+    </div>
+    <div class="progress-line"><i id="progress-fill"></i></div>
+  </header>
+
+  <main id="story" class="story"><!-- chapters injected --></main>
+
+  <div class="label-layer" id="labels" aria-hidden="true"></div>
+
+  <div class="model-note" data-copy="modelNote">结构示意 · 非等比例</div>
+
+  <div class="hint" id="hint">
+    <span class="hint-arrow" aria-hidden="true"></span>
+    <span data-copy="scroll">向下滚动</span>
+  </div>
+
+  <div class="loader" id="loader">
+    <div class="loader-inner">
+      <span class="loader-kicker">INTEL 18A</span>
+      <div class="loader-bar"><i></i></div>
+      <span class="loader-text" id="loader-text" data-copy="loading">正在装载晶圆…</span>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

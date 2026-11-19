@@ -2,7 +2,9 @@ import * as THREE from 'three';
 import { buildGAA } from '../models/gaa.js';
 import { rbox } from '../models/geo.js';
 import { anchor, makeFade } from '../models/common.js';
-import { gateGlass, metal } from '../scene/materials.js';
+import { gateGlass } from '../scene/materials.js';
+import { satinMetal } from '../models/specimen.js';
+import { buildHeroInterconnect } from '../models/hero-interconnect.js';
 import { lerp, srange } from '../core/util.js';
 
 // Rows describe the same four persistent silicon meshes throughout the scroll:
@@ -22,13 +24,13 @@ function buildFinGate(root) {
   const group = new THREE.Group();
   root.add(group);
   const unit = rbox(1, 1, 1, 0.045, 1);
-  const glass = gateGlass({ color: 0xa8e0e7, opacity: 0.34, extra: { side: THREE.FrontSide } });
+  const glass = gateGlass({ color: 0xb3d6dd, opacity: 0.26, extra: { side: THREE.FrontSide } });
   glass.userData.baseOpacity = glass.opacity;
   const oxide = new THREE.MeshStandardMaterial({
     color: 0x96cbc9, roughness: 0.6, metalness: 0.2, transparent: true, opacity: 0.5, depthWrite: false,
   });
   oxide.userData.baseOpacity = oxide.opacity;
-  const section = metal(0xa9ced3, { roughness: 0.4, extra: { metalness: 0.60 } });
+  const section = satinMetal(0xbbc6c4,0.28);
   const box = (material) => {
     const mesh = new THREE.Mesh(unit, material);
     group.add(mesh);
@@ -36,6 +38,8 @@ function buildFinGate(root) {
   };
   const roof = box(glass);
   const roofEdge = box(section);
+  const electrode = box(section);
+  const pad = box(satinMetal(0xd1c8b0,0.32));
   const fingers = Array.from({ length: 4 }, () => ({
     topFilm: box(oxide),
     topGate: box(glass),
@@ -79,12 +83,14 @@ function buildFinGate(root) {
         place(side.film, x + side.sign * (width / 2 + 0.024), y, 0, 0.048, h, gateLen + 0.016);
         const sx = x + side.sign * (width / 2 + 0.115);
         place(side.glass, sx, y + 0.015, 0, 0.14, h + 0.06, gateLen);
-        place(side.edge, sx, y + 0.015, -gateLen / 2, 0.14, h + 0.06, 0.035);
+        place(side.edge, sx, y + 0.015, -gateLen * 0.42, 0.14, h + 0.06, gateLen * 0.17);
       }
     }
     const w = Math.max(right - left + 0.50, 1.10);
     place(roof, (left + right) / 2, top + 0.161, 0, w, 0.215, gateLen);
-    place(roofEdge, (left + right) / 2, top + 0.161, -gateLen / 2, w, 0.215, 0.035);
+    place(roofEdge, (left + right) / 2, top + 0.161, -gateLen * 0.35, w, 0.215, gateLen * 0.30);
+    place(electrode,(left + right) / 2,top + 0.269,0,w - 0.17,0.08,gateLen * 0.78);
+    place(pad,(left + right) / 2,top + 0.343,0, Math.min(w * 0.55,1.06),0.075,gateLen * 0.56);
   }
   return { update };
 }
@@ -92,6 +98,7 @@ function buildFinGate(root) {
 export function buildDeviceEvolution() {
   const device = buildGAA();
   const { root, parts, anchors, metrics: m } = device;
+  const revealWiring = buildHeroInterconnect(device);
   const terminalHeight = m.stackTop - m.stackBottom + 0.45;
   const ribbons = Array.from({ length: 4 }, (_, i) =>
     [0, m.stackBottom + i * m.pitch - m.RIBBON_T / 2, m.RIBBON_W, m.RIBBON_T]);
@@ -105,7 +112,7 @@ export function buildDeviceEvolution() {
   // Pose times are tied to V3's chapter boundaries. A stable endpoint pad at
   // each end of the z axis makes even the FinFET-to-GAA hand-off traceable.
   const poses = [
-    [0, PLANAR], [0.181, PLANAR], [0.231, ONE_FIN], [0.276, ONE_FIN],
+    [0, ribbons], [0.026, ribbons], [0.061, PLANAR], [0.181, PLANAR], [0.231, ONE_FIN], [0.276, ONE_FIN],
     [0.304, TWO_FINS], [0.321, TWO_FINS], [0.350, FOUR_FINS], [0.365, FOUR_FINS],
     [0.401, THREE_FINS], [0.432, THREE_FINS], [0.475, ribbons],
   ];
@@ -139,7 +146,13 @@ export function buildDeviceEvolution() {
       highest = Math.max(highest, lane.bottom + lane.height);
       span = Math.max(span, Math.abs(lane.x) * 2 + lane.width);
     }
-    const wrap = srange(p, 0.461, 0.477);
+    // Show the finished 18A switch first, then dissolve directly to a planar
+    // section. The historical single-fin and multi-fin poses come later.
+    const intro = 1 - srange(p, 0.026, 0.061);
+    const portrait = 1 - srange(p,0.016,0.026);
+    revealWiring(portrait);
+    device.setGateCoverage(portrait);
+    const wrap = Math.max(1 - srange(p,0.024,0.040), srange(p, 0.461, 0.477));
     const fin = srange(p, 0.181, 0.231);
     const shorten = srange(p, 0.132, 0.181) * (1 - fin);
     const gateLen = lerp(1.72 - 0.88 * shorten, m.gateLen, fin);
@@ -148,9 +161,10 @@ export function buildDeviceEvolution() {
 
     // Only thickness and width change. Source and drain retain the same
     // centreline and longitudinal position from the first to the last frame.
-    const h = lerp(Math.max(highest - m.stiTop + 0.23, 0.27), terminalHeight, wrap);
-    const centreY = lerp(m.stiTop + h / 2 - 0.09, m.cy, wrap);
-    const widthScale = lerp((span + 0.62) / (m.RIBBON_W + 0.35), 1, wrap);
+    const terminalPose = Math.max(intro,wrap);
+    const h = lerp(Math.max(highest - m.stiTop + 0.23, 0.27), terminalHeight, terminalPose);
+    const centreY = lerp(m.stiTop + h / 2 - 0.09, m.cy, terminalPose);
+    const widthScale = lerp((span + 0.62) / (m.RIBBON_W + 0.35), 1, terminalPose);
     for (const end of parts.terminals) {
       end.position.y = centreY;
       end.scale.set(widthScale, h / terminalHeight, 1);
@@ -165,7 +179,7 @@ export function buildDeviceEvolution() {
     anchors.oxide.position.set(guide.x + guide.width * 0.48, upper + 0.045, gateLen * 0.50);
     const field = shorten * (1 - srange(p, 0.178, 0.212));
     device.setDrainField(field);
-    device.setConduction(gateOn ? srange(p, 0.465, 0.479) : 0, time);
+    device.setConduction(Math.max(1 - srange(p,0.022,0.035),gateOn ? srange(p, 0.465, 0.479) : 0), time);
   }
   return { ...device, kind: 'device', apply };
 }

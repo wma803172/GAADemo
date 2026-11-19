@@ -31,6 +31,16 @@ export function anchor(parent, x, y, z, tag) {
 }
 
 /** 让一组物体整体显隐 + 透明度 */
+// Three r170 bakes OPAQUE into the material program. A change of opacity
+// alone does not refresh that program when the same mesh changes render pass.
+export function setTransparency(material, transparent) {
+  if (material.transparent !== transparent) {
+    material.transparent = transparent;
+    material.needsUpdate = true;
+  }
+  material.depthWrite = !transparent;
+}
+
 export function makeFade(root) {
   return function fade(v) {
     const on = v > 0.003;
@@ -50,8 +60,7 @@ export function makeFade(root) {
           mm.opacity = base * v;
           const tr = v < 0.995;
           if (!mm.userData.fixedTransparent) {
-            mm.transparent = tr || !!mm.userData.origTransparent;
-            mm.depthWrite = !(tr || mm.userData.origTransparent);
+            setTransparency(mm,tr || !!mm.userData.origTransparent);
           }
         }
       }

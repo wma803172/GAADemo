@@ -9,22 +9,29 @@ import { tickMaterials } from './scene/materials.js';
 import { buildStory, renderStory, Labels } from './ui/ui.js';
 import { CHAPTERS, chapterAt } from './content.js';
 import { clamp, srange, win } from './core/util.js';
+import { COPY, chaptersFor, initialLanguage, rememberLanguage, localizeChrome } from './locale.js';
 
+let language = initialLanguage();
+let copy = COPY[language];
+let chapters = chaptersFor(language);
+localizeChrome(language);
 const canvas = document.getElementById('gl');
 const world = createWorld(canvas);
 const { scene, camera, composer } = world;
 
 const stage = createStage(scene);
-const beats = buildStory(document.getElementById('story'));
+const story = document.getElementById('story');
+let gateOn = true;
+let beats = buildStory(story, chapters, copy, gateOn);
 const labels = new Labels(document.getElementById('labels'), camera, stage.models);
 const nav = Array.from(document.querySelectorAll('.chapter-nav a'));
-const gateSwitch = document.getElementById('gate-switch');
-let gateOn = true;
-gateSwitch.addEventListener('click', () => {
+story.addEventListener('click', e => {
+  const gateSwitch = e.target.closest('#gate-switch');
+  if (!gateSwitch) return;
   gateOn = !gateOn;
   gateSwitch.setAttribute('aria-pressed', String(gateOn));
-  gateSwitch.querySelector('.gate-action').textContent = gateOn ? '关断沟道' : '接通沟道';
-  document.getElementById('gate-state').textContent = gateOn ? '四层沟道导通' : '四层沟道已关断';
+  gateSwitch.querySelector('.gate-action').textContent = gateOn ? copy.turnOff : copy.turnOn;
+  document.getElementById('gate-state').textContent = gateOn ? copy.gateOn : copy.gateOff;
 });
 
 /* --------------------------------------------------------------- 拖拽 */
@@ -50,7 +57,6 @@ const endDrag = () => { dragging = false; canvas.classList.remove('is-dragging')
 canvas.addEventListener('pointerup', endDrag);
 canvas.addEventListener('pointercancel', endDrag);
 
-const story = document.getElementById('story');
 const progressFill = document.getElementById('progress-fill');
 const chapterCount = document.getElementById('chapter-count');
 const hint = document.getElementById('hint');
@@ -132,13 +138,50 @@ fullBtn?.addEventListener('click', () => {
 
 const qBtn = document.getElementById('btn-quality');
 let qIndex = 0;
-const qList = [['high', '高'], ['mid', '中'], ['low', '低']];
+const qList = ['high', 'mid', 'low'];
+function updateControls() {
+  qBtn.textContent = copy.qualities[qIndex];
+  qBtn.title = copy.quality + ' · ' + copy.qualities[qIndex];
+  qBtn.setAttribute('aria-label', qBtn.title);
+  fullBtn.title = document.fullscreenElement ? copy.exitFull : copy.enterFull;
+  fullBtn.setAttribute('aria-label', fullBtn.title);
+}
+updateControls();
+document.addEventListener('fullscreenchange', updateControls);
 qBtn?.addEventListener('click', () => {
   qIndex = (qIndex + 1) % qList.length;
-  world.setQuality(qList[qIndex][0]);
+  world.setQuality(qList[qIndex]);
   applyFraming();
-  qBtn.textContent = qList[qIndex][1];
+  updateControls();
 });
+
+function showChapter(ci) {
+  lastChapter = ci;
+  labels.setChapter(chapters[ci]);
+  chapterCount.textContent = String(ci + 1).padStart(2, '0') + ' / ' + String(chapters.length).padStart(2, '0');
+  chapterCount.setAttribute('aria-label', copy.chapter + ' ' + chapterCount.textContent);
+  const active = ci <= 5 ? 0 : ci === 6 ? 1 : ci <= 11 ? 2 : -1;
+  nav.forEach((link, i) => {
+    if (i === active) link.setAttribute('aria-current', 'location');
+    else link.removeAttribute('aria-current');
+  });
+  renderStory(beats, p);
+}
+
+for (const button of document.querySelectorAll('.language-switch button[data-lang]')) {
+  button.addEventListener('click', () => {
+    const next = button.dataset.lang;
+    if (next === language) return;
+    language = next;
+    copy = COPY[language];
+    chapters = chaptersFor(language);
+    rememberLanguage(language);
+    localizeChrome(language);
+    updateControls();
+    beats = buildStory(story, chapters, copy, gateOn);
+    showChapter(chapterAt(p).index);
+  });
+}
 
 /* --------------------------------------------------------------- loop */
 let last = performance.now();
@@ -180,27 +223,14 @@ function render(now) {
   }
 
   // 光照跟着镜头走一点，让金属一直有"眼神光"
-  world.key.position.set(camera.position.x + 6, camera.position.y + 9, camera.position.z + 5);
   world.head.position.copy(camera.position);
   world.headTarget.position.copy(out.cameraTarget);
-  world.floor.position.x = camera.position.x;
-  world.floor.position.z = camera.position.z;
-  world.floor.material.uniforms.uCenter.value.set(camera.position.x, camera.position.z);
+  world.updateBackdrop?.(p, time);
 
   tickMaterials(scene, time);
 
   const ci = chapterAt(p).index;
-  if (ci !== lastChapter) {
-    lastChapter = ci;
-    labels.setChapter(CHAPTERS[ci]);
-    chapterCount.textContent = String(ci + 1).padStart(2, '0') + ' / ' + String(CHAPTERS.length).padStart(2, '0');
-    const active = ci <= 5 ? 0 : ci === 6 ? 1 : ci <= 11 ? 2 : -1;
-    nav.forEach((link, i) => {
-      if (i === active) link.setAttribute('aria-current', 'location');
-      else link.removeAttribute('aria-current');
-    });
-    renderStory(beats, p);
-  }
+  if (ci !== lastChapter) showChapter(ci);
 
   labels.render();
   progressFill.style.width = (p * 100).toFixed(2) + '%';

@@ -11,9 +11,9 @@ const nets = [
 export const CHAPTERS = [
   {
     id: 'hero', weight: 0.050, kicker: 'INTEL 18A', kickerCn: '晶体管的演进',
-    title: '一颗开关，<br><em>两条线索。</em>',
-    lead: '先看栅极怎样一步步包住硅，再跟一根电源线走到芯片背面。',
-    body: ['从右边这颗平面晶体管开始。往下滚动，看同一位置上的沟道怎样改变形状。'],
+    title: '四层硅带，<br><em>两面布线。</em>',
+    lead: 'Intel 18A 让四层硅带共用一个栅极，把电源线铺到芯片背面。',
+    body: ['往下滚动，从最早的平面开关看起。'],
   },
   {
     id: 'planar', weight: 0.080, kicker: '1960', kickerCn: '平面 MOS 晶体管',

@@ -1,8 +1,9 @@
 import * as THREE from 'three';
-import { CHAPTERS, chapterAt } from '../content.js';
+import { chapterAt } from '../content.js';
 
-export function buildStory(root) {
-  return CHAPTERS.map((chapter, index) => {
+export function buildStory(root, chapters, copy, gateOn) {
+  const fragment = document.createDocumentFragment();
+  const beats = chapters.map((chapter, index) => {
     const section = document.createElement('section');
     section.dataset.chapter = chapter.id;
     section.className = 'beat' + (chapter.outro ? ' beat-outro' : '');
@@ -11,16 +12,18 @@ export function buildStory(root) {
     } else {
       const tag = index === 0 ? 'h1' : 'h2';
       const body = (chapter.body || []).map(line => '<p data-rv>' + line + '</p>').join('');
-      const legend = chapter.legend ? '<ul class="net-legend" aria-label="线网颜色">' +
+      const legend = chapter.legend ? '<ul class="net-legend" aria-label="' + copy.legend + '">' +
         chapter.legend.map(([color, name]) => '<li style="--net-color:' + color + '">' + name + '</li>').join('') + '</ul>' : '';
-      const controls = chapter.gateControl ? '<div class="gate-control"><button id="gate-switch" type="button" aria-pressed="true" aria-label="沟道导通"><span class="switch-track" aria-hidden="true"><i></i></span><span class="gate-action">关断沟道</span></button><span id="gate-state" role="status">四层沟道导通</span></div>' : '';
+      const controls = chapter.gateControl ? '<div class="gate-control"><button id="gate-switch" type="button" aria-pressed="' + gateOn + '" aria-label="' + copy.gateControl + '"><span class="switch-track" aria-hidden="true"><i></i></span><span class="gate-action">' + (gateOn ? copy.turnOff : copy.turnOn) + '</span></button><span id="gate-state" role="status">' + (gateOn ? copy.gateOn : copy.gateOff) + '</span></div>' : '';
       section.innerHTML = '<p class="kicker"><b>' + chapter.kicker + '</b><span class="rule"></span><span>' + chapter.kickerCn + '</span></p>' +
         '<' + tag + ' data-rv>' + chapter.title + '</' + tag + '>' +
         '<p class="lead" data-rv>' + chapter.lead + '</p>' + body + controls + legend;
     }
-    root.appendChild(section);
+    fragment.appendChild(section);
     return section;
   });
+  root.replaceChildren(fragment);
+  return beats;
 }
 
 export function renderStory(beats, p) {

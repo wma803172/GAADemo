@@ -2,28 +2,44 @@
    meshes and coordinates, including the landing points of all three nets. */
 import * as THREE from 'three';
 import { anchor, makeFade } from './common.js';
-import { rbox } from './geo.js';
+import { trenchRail, metalPlug, dielectricEdgeGeometry, buildSectionedSilicon } from './interconnect-geometry.js';
 import { lerp, srange } from '../core/util.js';
 import { NETS, DEVICE_X, VIA_X, conductor, setAlpha, buildDeviceDetail } from '../chapters/power-detail.js';
 
 const WIDTH = 5.9;
 const DEPTH = 5.25;
-const BOX = rbox(1, 1, 1, 0.065, 1);
-const POST = new THREE.CylinderGeometry(1, 1, 1, 12);
+const RAIL = trenchRail();
+const POST = metalPlug();
+const DIELECTRIC_EDGE = dielectricEdgeGeometry(WIDTH, DEPTH);
 const matrix = new THREE.Matrix4();
 const position = new THREE.Vector3();
 const scale = new THREE.Vector3();
 const rotation = new THREE.Quaternion();
+const alongX = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0), Math.PI/2);
 
 function instances(group, geometry, rows, mat) {
   if (!rows.length) return;
   const mesh = new THREE.InstancedMesh(geometry, mat, rows.length);
   for (let i = 0; i < rows.length; i++) {
     const [x, y, z, w, h, d] = rows[i];
-    mesh.setMatrixAt(i, matrix.compose(position.set(x, y, z), rotation, scale.set(w, h, d)));
+    const horizontal = geometry === RAIL && w > d;
+    const orient = horizontal ? alongX : rotation;
+    scale.set(horizontal ? d : w,h,horizontal ? w : d);
+    mesh.setMatrixAt(i, matrix.compose(position.set(x, y, z), orient, scale));
   }
   mesh.computeBoundingSphere();
   group.add(mesh);
+}
+
+function edgeStrip(layer, tint) {
+  const mat = new THREE.MeshStandardMaterial({
+    color:tint, metalness:.23, roughness:.33, envMapIntensity:1.15,
+    transparent:true, opacity:.48, depthWrite:false,
+  });
+  const mesh = new THREE.Mesh(DIELECTRIC_EDGE,mat);
+  mesh.name = 'uncutInsulatorEdge';
+  layer.add(mesh);
+  return mat;
 }
 
 function flatTrack(start, end, width, thick) {
@@ -69,12 +85,13 @@ function buildSignals(root) {
 
   for (let level = 0; level < frontY.length; level++) {
     const layer = new THREE.Group();
-    const backMat = conductor(0x609a9d, 0.28);
+    const backMat = conductor(level < 3 ? 0x87aaae : 0x6b999e,0.32);
     const mainMat = conductor(NETS.signal, 0.64);
+    const edge = edgeStrip(layer,0x688287);
     const width = 0.06 + level * 0.012, thick = 0.064 + level * 0.008;
-    instances(layer, BOX,
+    instances(layer, RAIL,
       tracks.slice(1).map(route => flatTrack(route[level], route[level + 1], width, thick)), backMat);
-    instances(layer, BOX, [flatTrack(tracks[0][level], tracks[0][level + 1], width + 0.045, thick + 0.025)], mainMat);
+    instances(layer, RAIL, [flatTrack(tracks[0][level], tracks[0][level + 1], width + 0.045, thick + 0.025)], mainMat);
     const backgroundDrops = tracks.slice(1).map(route => route[level + 1]);
     const fgDrop = tracks[0][level + 1];
     const drops = level + 1 === frontY.length ? [] : [
@@ -82,16 +99,17 @@ function buildSignals(root) {
       interlevel(root, [fgDrop], (width + 0.04) * 0.54, mainMat),
     ];
     root.add(layer);
-    layers.push({ layer, drops, backMat, mainMat });
+    layers.push({ layer, drops, backMat, mainMat, edge });
   }
   return {
     layers, tracks,
     update(split, assemble, detail, fade) {
-      layers.forEach(({ layer, backMat, mainMat }, i) => {
+      layers.forEach(({ layer, backMat, mainMat, edge }, i) => {
         layer.position.y = lerp(frontY[i], 1.18 + i * 0.47, split);
         layer.position.y = lerp(layer.position.y, compactY[i], assemble);
         setAlpha(backMat, fade * (1 - 0.98 * detail));
         setAlpha(mainMat, fade * (1 - (i === 0 ? 0 : 0.97) * detail));
+        setAlpha(edge, fade * .48 * (1-detail));
       });
       layers.forEach(({ layer, drops }, i) => {
         for (const place of drops) place(layer.position.y, layers[i + 1].layer.position.y);
@@ -115,6 +133,7 @@ function buildPower(root, locals) {
   const layers = POWER_LEVELS.map((config, level) => {
     const alongZ = level % 2 === 0;
     const layer = new THREE.Group();
+    const edge = edgeStrip(layer,0x706f7a);
     const lines = [config.pick, ...config.other].flatMap((p, i) => {
       const vdd = i % 2 ? -p : p;
       return [{ at: vdd, net: 'vdd', featured: i === 0 }, { at: -vdd, net: 'vss', featured: i === 0 }];
@@ -123,12 +142,12 @@ function buildPower(root, locals) {
     for (const net of ['vdd', 'vss']) {
       for (const featured of [true, false]) {
         const key = net + (featured ? 'Focus' : '');
-        const color = featured ? NETS[net] : net === 'vdd' ? 0xaa7554 : 0x516b96;
+        const color = featured ? NETS[net] : net === 'vdd' ? 0xc48d6a : 0x7890ac;
         mats[key] = conductor(color, featured ? 0.49 : 0.32);
         const h = 0.075 + level * 0.015;
         const rows = lines.filter(l => l.net === net && l.featured === featured).map(l =>
           alongZ ? [l.at, 0, 0, config.width, h, DEPTH] : [0, 0, l.at, WIDTH, h, config.width]);
-        instances(layer, BOX, rows, mats[key]);
+        instances(layer, RAIL, rows, mats[key]);
       }
     }
     const contactRails = [];
@@ -141,12 +160,12 @@ function buildPower(root, locals) {
         // In the cutaway, keep the actual segment between the next metal
         // junction and its nano-via; the full-width bus recedes behind it.
         const row = flatTrack(crossing, landing, config.width + 0.006, 0.083);
-        instances(layer, BOX, [row], mat);
+        instances(layer, RAIL, [row], mat);
         contactRails.push(mat);
       });
     }
     root.add(layer);
-    return { layer, alongZ, lines, mats, contactRails, drops: [] };
+    return { layer, alongZ, lines, mats, edge, contactRails, drops: [] };
   });
 
   for (let i = 0; i + 1 < layers.length; i++) {
@@ -175,7 +194,7 @@ function buildPower(root, locals) {
       const front = 1 - srange(split, 0.05, 0.48);
       const back = srange(split, 0.48, 0.96);
       const opacity = front + back;
-      layers.forEach(({ layer, mats, contactRails }, i) => {
+      layers.forEach(({ layer, mats, contactRails, edge }, i) => {
         const frontY = 4.11 + i * 0.385 + split * 0.16;
         const backY = lerp(-0.75 - i * 0.48, -0.57 - i * 0.265, assemble);
         layer.position.y = split < 0.48 ? frontY : backY;
@@ -184,6 +203,7 @@ function buildPower(root, locals) {
           setAlpha(mats[net + 'Focus'], fade * opacity * (1 - (i === 0 ? 0.85 : 0.96) * detail));
         }
         contactRails.forEach(mat => setAlpha(mat, fade * opacity * detail));
+        setAlpha(edge, fade * opacity * .50 * (1-detail));
       });
       layers.forEach(({ layer, drops }, i) => {
         for (const place of drops) place(layer.position.y, layers[i + 1].layer.position.y);
@@ -212,6 +232,8 @@ function powerMarkers(root, net, local) {
   const markerMat = new THREE.MeshBasicMaterial({ color: net === 'vdd' ? 0xffdea0 : 0xaabeff });
   markerMat.toneMapped = false;
   const sphere = new THREE.SphereGeometry(0.073, 12, 8);
+  const tangent = new THREE.Vector3();
+  const localAxis = new THREE.Vector3(0,1,0);
   const markers = [0, 1, 2].map(() => {
     const mesh = new THREE.Mesh(sphere, markerMat);
     root.add(mesh);
@@ -234,10 +256,18 @@ function powerMarkers(root, net, local) {
       let i = 0;
       while (i < path.length - 2 && distance > lengths[i]) distance -= lengths[i++];
       dot.position.lerpVectors(path[i].point, path[i + 1].point, distance / (lengths[i] || 1));
-      // Place the glint at the visible skin of the conductor.
-      dot.position.x += 0.045;
-      dot.position.y += 0.054;
-      dot.scale.setScalar(1 - detail * 0.27);
+      // A moving glint on the outside of the copper leaves the contour of a
+      // small via legible, even in the microscope shot.
+      tangent.subVectors(path[i+1].point,path[i].point).normalize();
+      dot.quaternion.setFromUnitVectors(localAxis,tangent);
+      if (Math.abs(tangent.y) > .5) {
+        dot.position.x += .053;
+        dot.position.z += .043;
+      } else {
+        dot.position.y += .052;
+      }
+      const radius = .80 - .36 * detail;
+      dot.scale.set(radius,1.24,radius);
     });
     setAlpha(markerMat, opacity);
   };
@@ -252,16 +282,8 @@ export function buildStack() {
     powerMarkers(root, 'vss', detailDevice.locals[0]),
     powerMarkers(root, 'vdd', detailDevice.locals[1]),
   ];
-  const substrateMat = new THREE.MeshStandardMaterial({
-    color: 0x426b7a, emissive: 0x142d34, emissiveIntensity: 0.65, opacity: 0.32,
-    transparent: true, depthWrite: false, roughness: 0.46, metalness: 0.18,
-  });
-  const substrate = new THREE.Mesh(new THREE.BoxGeometry(WIDTH + 0.08, 0.20, DEPTH + 0.08), substrateMat);
-  substrate.position.y = -0.18;
+  const substrate = buildSectionedSilicon(WIDTH+.08,DEPTH+.08,detailDevice.locals);
   root.add(substrate);
-  const edgeMat = new THREE.LineBasicMaterial({ color: 0xa3d8dc, transparent: true, opacity: 0.46 });
-  const frame = new THREE.LineSegments(new THREE.EdgesGeometry(substrate.geometry), edgeMat);
-  substrate.add(frame);
 
   const anchors = { ...detailDevice.anchors,
     rail: anchor(power.layers[4].layer, POWER_LEVELS[4].pick, 0, 1.2, 'rail'),
@@ -285,8 +307,6 @@ export function buildStack() {
     const { front, back, frontY, backY } = power.update(split, assemble, detail, visibility);
     detailDevice.update(frontY, backY, signals.layers[0].layer.position.y, front, back, visibility);
     markers.forEach(update => update(power.layers, time, detail, back * visibility));
-    substrateMat.opacity = visibility * (0.32 - detail * 0.24);
-    edgeMat.opacity = visibility * (0.46 - detail * 0.42);
   }
   apply();
   return { root, parts: { substrate }, anchors, fade, apply, kind: 'stack' };

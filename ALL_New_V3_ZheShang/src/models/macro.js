@@ -5,309 +5,316 @@
    --------------------------------------------------------------------------- */
 import * as THREE from 'three';
 import { rbox, roundedRectShape, extrude } from './geo.js';
-import { silicon, oxide, metal, rim, gateGlass } from '../scene/materials.js';
-import { anchor, makeFade } from './common.js';
+import { metal } from '../scene/materials.js';
+import { makeFade } from './common.js';
 import { rand } from '../core/util.js';
 
 /* ---------------------------------------------------------------- textures */
 
+let diePattern;
 function dieTexture() {
-  const S = 512;
+  if (diePattern) return diePattern;
   const cv = document.createElement('canvas');
-  cv.width = S; cv.height = S;
-  const ctx = cv.getContext('2d');
-  ctx.fillStyle = '#0b1a2a';
-  ctx.fillRect(0, 0, S, S);
+  cv.width = 1024; cv.height = 824;
+  const c = cv.getContext('2d');
+  c.fillStyle = '#31393f';
+  c.fillRect(0, 0, cv.width, cv.height);
 
-  // 大块功能区
-  const blocks = [
-    [0.06, 0.08, 0.48, 0.44, '#12314b'],
-    [0.56, 0.08, 0.36, 0.44, '#102a41'],
-    [0.06, 0.56, 0.30, 0.36, '#0f2637'],
-    [0.38, 0.56, 0.26, 0.36, '#11293c'],
-    [0.66, 0.56, 0.26, 0.36, '#0f2637'],
-  ];
-  for (const [x, y, w, h, c] of blocks) {
-    ctx.fillStyle = c;
-    ctx.fillRect(x * S, y * S, w * S, h * S);
-    ctx.strokeStyle = 'rgba(120,200,240,0.35)';
-    ctx.lineWidth = 1.5;
-    ctx.strokeRect(x * S + 2, y * S + 2, w * S - 4, h * S - 4);
+  // Dense memory mats, mixed-size logic islands and perimeter pad banks form
+  // a representative die surface rather than a specific product floorplan.
+  const colors = ['#a7a3b0','#77778e','#7b9398','#a99081','#698987','#a59d8c'];
+  function memory(x,y,w,h,seed) {
+    c.fillStyle = '#4d5864';
+    c.fillRect(x,y,w,h);
+    const cols = 4, rows = 4, cw = w/cols, rh = h/rows;
+    for (let row=0; row<rows; row++) for (let col=0; col<cols; col++) {
+      const dx=x+col*cw+1, dy=y+row*rh+1;
+      c.fillStyle = colors[(seed+row+col)%colors.length];
+      c.fillRect(dx,dy,cw-2,rh-3);
+      c.fillStyle = 'rgba(28,38,45,.57)';
+      for(let v=2;v<rh-3;v+=3.5) c.fillRect(dx+1,dy+v,cw-4,1.1);
+    }
   }
-
-  // SRAM 阵列的细密纹理
-  ctx.globalAlpha = 0.55;
-  for (let i = 0; i < 4200; i++) {
-    const bx = Math.floor(rand(i * 3.1) * 18) / 18;
-    const by = Math.floor(rand(i * 7.7) * 18) / 18;
-    ctx.fillStyle = rand(i) > 0.5 ? 'rgba(90,180,230,0.30)' : 'rgba(60,120,180,0.22)';
-    ctx.fillRect(0.06 * S + bx * 0.48 * S, 0.08 * S + by * 0.44 * S, 2, 2);
+  function logic(x,y,w,h,seed) {
+    c.fillStyle = '#3e494f';
+    c.fillRect(x,y,w,h);
+    for(let row=0;row<Math.floor(h/5);row++) {
+      let dx=x+1, i=0;
+      while(dx<x+w-2) {
+        const value=rand(++i*2.1+row*301+seed);
+        const length=Math.min(2+value*14,x+w-2-dx);
+        c.fillStyle=colors[Math.floor(value*colors.length)];
+        c.fillRect(dx,y+row*5+1,length,3.1);
+        dx+=length+1.6;
+      }
+    }
   }
-  ctx.globalAlpha = 1;
-
-  // 光亮的"活着"的区块
-  const glow = ctx.createRadialGradient(0.3 * S, 0.3 * S, 10, 0.3 * S, 0.3 * S, 0.22 * S);
-  glow.addColorStop(0, 'rgba(90,220,255,0.42)');
-  glow.addColorStop(1, 'rgba(90,220,255,0)');
-  ctx.fillStyle = glow;
-  ctx.fillRect(0, 0, S, S);
-
+  for (let row=0;row<3;row++) for(let col=0;col<4;col++) {
+    const x=36+col*170,y=34+row*242,seed=17+col*13+row*61;
+    c.fillStyle='#69727a';c.fillRect(x,y,162,231);
+    c.fillStyle='#363f47';c.fillRect(x+2,y+2,158,227);
+    memory(x+5,y+5,151,62,seed);
+    logic(x+5,y+73,95,105,seed);
+    memory(x+106,y+73,49,104,seed+1);
+    logic(x+5,y+184,151,39,seed+74);
+  }
+  for(let row=0;row<6;row++) {
+    const y=35+row*122;
+    memory(727,y,133,113,41+row);
+    logic(871,y,114,113,317+row);
+  }
+  memory(38,772,248,22,2);
+  logic(297,772,380,22,11);
+  memory(689,772,294,22,24);
+  c.lineWidth=1;
+  for (let i=0;i<5;i++) {
+    c.strokeStyle=i%2 ? '#989d9c' : '#455b59';
+    c.strokeRect(8+i*3,8+i*3,1008-i*6,808-i*6);
+  }
   const tex = new THREE.CanvasTexture(cv);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 8;
+  diePattern = tex;
   return tex;
 }
 
-function deckTexture() {
-  const W = 512, H = 340;
-  const cv = document.createElement('canvas');
-  cv.width = W; cv.height = H;
-  const ctx = cv.getContext('2d');
-  ctx.fillStyle = '#1a2029';
-  ctx.fillRect(0, 0, W, H);
+function solid(parent, geometry, material, x = 0, y = 0, z = 0) {
+  const object = new THREE.Mesh(geometry, material);
+  object.position.set(x, y, z);
+  parent.add(object);
+  return object;
+}
 
-  // 键盘
-  const kx = 62, ky = 40, kw = 388, kh = 168;
-  ctx.fillStyle = '#0e1319';
-  ctx.fillRect(kx - 8, ky - 8, kw + 16, kh + 16);
-  const cols = 14, rows = 5;
-  const cw = kw / cols, ch = kh / rows;
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      if (c === 0 && r === 4) continue;
-      ctx.fillStyle = '#242c37';
-      ctx.fillRect(kx + c * cw + 2, ky + r * ch + 2, cw - 4, ch - 4);
-      ctx.fillStyle = 'rgba(140,180,215,0.16)';
-      ctx.fillRect(kx + c * cw + 2, ky + r * ch + 2, cw - 4, 2);
-    }
+function batch(parent, geometry, material, poses) {
+  const group = new THREE.InstancedMesh(geometry, material, poses.length);
+  const transform = new THREE.Object3D();
+  poses.forEach(([x, y, z, sx = 1, sy = 1, sz = 1], i) => {
+    transform.position.set(x, y, z);
+    transform.scale.set(sx, sy, sz);
+    transform.updateMatrix();
+    group.setMatrixAt(i, transform.matrix);
+  });
+  group.instanceMatrix.needsUpdate = true;
+  parent.add(group);
+  return group;
+}
+
+// Apertures are part of the machined top surface. The key tray and
+// trackpad sit at their own heights inside these openings.
+function chassisPlate(parent, width, depth, height, radius, y, mat, holes = []) {
+  const outline = roundedRectShape(width, depth, radius);
+  for (const [w, d, x, z, r] of holes) {
+    const points = roundedRectShape(w, d, r).getPoints(8).map(
+      p => new THREE.Vector2(p.x + x, p.y - z)
+    );
+    outline.holes.push(new THREE.Path(points));
   }
-  // 空格
-  ctx.fillStyle = '#242c37';
-  ctx.fillRect(kx + cw * 3 + 2, ky + ch * 4 + 2, cw * 7 - 4, ch - 4);
-
-  // 触控板
-  ctx.fillStyle = '#2b3340';
-  ctx.fillRect(W / 2 - 78, 236, 156, 86);
-  ctx.strokeStyle = 'rgba(150,200,235,0.22)';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(W / 2 - 78, 236, 156, 86);
-
-  const tex = new THREE.CanvasTexture(cv);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-}
-
-function screenTexture() {
-  const W = 512, H = 320;
-  const cv = document.createElement('canvas');
-  cv.width = W; cv.height = H;
-  const ctx = cv.getContext('2d');
-  const g = ctx.createLinearGradient(0, 0, W, H);
-  g.addColorStop(0, '#061422');
-  g.addColorStop(0.45, '#0c2f4d');
-  g.addColorStop(1, '#123a5c');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, W, H);
-
-  // 抽象的窗口
-  ctx.fillStyle = 'rgba(120,220,255,0.14)';
-  ctx.fillRect(34, 30, 180, 118);
-  ctx.fillStyle = 'rgba(120,220,255,0.10)';
-  ctx.fillRect(240, 30, 238, 60);
-  ctx.fillRect(240, 108, 238, 40);
-  ctx.fillStyle = 'rgba(220,245,255,0.55)';
-  ctx.fillRect(34, 176, 300, 3);
-  ctx.fillStyle = 'rgba(160,225,255,0.30)';
-  ctx.fillRect(34, 192, 220, 3);
-  ctx.fillRect(34, 206, 260, 3);
-
-  const tex = new THREE.CanvasTexture(cv);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
+  const part = solid(parent, extrude(outline, height, { bevel: 0.006 }), mat, 0, y, 0);
+  part.rotation.x = -Math.PI / 2;
+  return part;
 }
 
 /* ------------------------------------------------------------------ chips */
 
-export function buildDie() {
+export function buildDie({ mounted = false } = {}) {
   const root = new THREE.Group();
-  const parts = {};
-
-  const base = new THREE.Mesh(rbox(5.4, 0.18, 4.4, 0.03, 2), new THREE.MeshPhysicalMaterial({
-    color: 0x33587c, metalness: 0.45, roughness: 0.40, clearcoat: 0.25,
-  }));
-  root.add(base);
-  parts.base = base;
-
-  const tex = dieTexture();
-  const top = new THREE.Mesh(
-    new THREE.PlaneGeometry(5.3, 4.3),
-    new THREE.MeshStandardMaterial({
-      map: tex, roughness: 0.30, metalness: 0.45,
-      emissive: new THREE.Color(0x4aa8e0), emissiveIntensity: 2.4,
-      emissiveMap: tex,
-    })
-  );
-  top.rotation.x = -Math.PI / 2;
-  top.position.y = 0.092;
-  root.add(top);
-  parts.top = top;
-
-  // 芯粒边缘的一圈冷光，勾出"这是一颗被切下来的芯片"
-  const rimLine = new THREE.LineSegments(
-    new THREE.EdgesGeometry(base.geometry),
-    new THREE.LineBasicMaterial({ color: 0x7fd8ff, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false })
-  );
-  root.add(rimLine);
-
-  parts.anchors = {};
-  return { root, parts, fade: makeFade(root), kind: 'die' };
+  const slice = new THREE.Group();
+  if (!mounted) slice.rotation.set(0.20, -0.16, 0);
+  root.add(slice);
+  const base = solid(slice, rbox(5.4, 0.14, 4.4, 0.025, 2),
+    new THREE.MeshPhysicalMaterial({color: 0x59606b, metalness: 0.70, roughness: 0.29}));
+  const top = solid(slice, new THREE.PlaneGeometry(5.35,4.35),
+    new THREE.MeshPhysicalMaterial({
+      map: dieTexture(), roughness: 0.42, metalness: 0.39, clearcoat: 0.23,
+      emissiveMap: dieTexture(), emissive: 0xbdb5a7, emissiveIntensity: 0.28,
+    }),0,0.071,0);
+  top.rotation.x = -Math.PI/2;
+  return {root,parts:{base,top}, fade:makeFade(root),kind:'die'};
 }
 
 export function buildPackage() {
   const root = new THREE.Group();
-  const parts = {};
-
-  // 基板
-  const substr = new THREE.Mesh(rbox(7.6, 0.34, 6.6, 0.03, 2), new THREE.MeshPhysicalMaterial({
-    color: 0x27414f, metalness: 0.40, roughness: 0.44, clearcoat: 0.2,
-  }));
-  substr.position.y = -0.2;
-  root.add(substr);
-  parts.substr = substr;
-
-  // 边缘金色焊盘
-  const padMat = metal(0xd9a35a, { roughness: 0.3 });
-  for (let i = 0; i < 26; i++) {
-    const t = (i / 25 - 0.5);
-    for (const z of [-3.25, 3.25]) {
-      const p = new THREE.Mesh(rbox(0.16, 0.03, 0.2, 0.01, 1), padMat);
-      p.position.set(t * 6.6, -0.02, z);
-      root.add(p);
+  const assembly = new THREE.Group();
+  assembly.rotation.set(0.16,-0.15,0);
+  root.add(assembly);
+  const substr = solid(assembly,rbox(7.6,0.24,6.6,0.06,2),
+    new THREE.MeshStandardMaterial({color:0x274c47,roughness:0.53,metalness:0.25}),0,-0.16,0);
+  const die = buildDie({mounted:true});
+  die.root.scale.setScalar(1.09);
+  die.root.position.y = 0.045;
+  assembly.add(die.root);
+  const pads = [], caps = [], capEnds = [];
+  // Capacitors are mounted in rows close to the die. Each ceramic body has
+  // a solderable termination at either end.
+  for (const side of [-1,1]) {
+    for (let i=0;i<18;i++) {
+      const x=(i-8.5)*0.326;
+      pads.push([x,-0.034,side*3.10]);
+      if(i%6 === 0) continue;
+      const z=side*2.70;
+      caps.push([x,0.021,z]);
+      for(const end of [-1,1]) capEnds.push([x,0.021,z+end*0.081]);
     }
+    for(let i=0;i<15;i++) pads.push([side*3.60,-0.034,(i-7)*0.376,0.52,1,0.72]);
   }
-
-  // 芯粒
-  const die = buildDie();
-  die.root.position.y = 0.01;
-  die.root.scale.setScalar(1.12);
-  root.add(die.root);
-  parts.die = die.root;
-
-  // 去耦电容
-  for (let i = 0; i < 22; i++) {
-    const a = (i / 22) * Math.PI * 2;
-    const c = new THREE.Mesh(rbox(0.16, 0.10, 0.1, 0.02, 1), new THREE.MeshStandardMaterial({
-      color: 0x8a6a45, metalness: 0.8, roughness: 0.4,
-    }));
-    c.position.set(Math.cos(a) * 3.45, 0.06, Math.sin(a) * 2.85);
-    root.add(c);
-  }
-
-  return { root, parts, fade: makeFade(root), kind: 'package' };
+  const ceramic = new THREE.MeshStandardMaterial({color:0x9f805d,roughness:0.55,metalness:0.15});
+  batch(assembly,rbox(0.20,0.014,0.095,0.006,1),metal(0xc3a477,{roughness:0.32}),pads);
+  batch(assembly,rbox(0.115,0.11,0.13,0.012,1),ceramic,caps);
+  batch(assembly,rbox(0.118,0.112,0.042,0.012,1),metal(0xa7a9a5,{roughness:0.34}),capEnds);
+  return {root,parts:{substr,die:die.root},fade:makeFade(root),kind:'package'};
 }
 
 export function buildServer() {
   const root = new THREE.Group();
-  const parts = {};
-
-  // 主板
-  const board = new THREE.Mesh(rbox(11, 0.12, 7.6, 0.03, 1), new THREE.MeshPhysicalMaterial({
-    color: 0x1d4a41, metalness: 0.30, roughness: 0.52, clearcoat: 0.25,
-  }));
+  const board = new THREE.Group();
+  board.rotation.set(0.19, -0.12, 0);
   root.add(board);
 
-  // CPU 插槽 + 散热器
-  const socket = new THREE.Mesh(rbox(4.4, 0.16, 4.4, 0.02, 1), new THREE.MeshPhysicalMaterial({
-    color: 0x152430, metalness: 0.5, roughness: 0.35,
-  }));
-  socket.position.set(-1.6, 0.13, 0.2);
-  root.add(socket);
+  const mask = new THREE.MeshStandardMaterial({ color: 0x21463d, metalness: 0.25, roughness: 0.52 });
+  const frame = metal(0xa0a9ae, { roughness: 0.36 });
+  const polymer = new THREE.MeshStandardMaterial({ color: 0x1a2228, roughness: 0.70 });
+  const padMat = metal(0xc39257, { roughness: 0.35 });
+  const boardShape = roundedRectShape(11, 7.6, 0.18);
+  const screwLocations = [[-5.10, -3.40], [5.10, -3.40], [-5.10, 3.40], [5.10, 3.40]];
+  for (const [x, z] of screwLocations) {
+    const hole = new THREE.Path();
+    hole.absarc(x, -z, 0.103, 0, Math.PI * 2, true);
+    boardShape.holes.push(hole);
+    const rim = solid(board, new THREE.RingGeometry(0.105, 0.185, 24), padMat, x, 0.066, z);
+    rim.rotation.x = -Math.PI / 2;
+  }
+  const pcb = solid(board, extrude(boardShape, 0.12, { bevel: 0 }), mask);
+  pcb.rotation.x = -Math.PI / 2;
 
+  // Keep each fin in the coordinate frame of its own base. The whole
+  // socket assembly receives the offset on the PCB exactly once.
+  solid(board, rbox(4.4, 0.16, 4.35, 0.05, 2), polymer, -1.6, 0.14, 0.2);
+  solid(board, rbox(4.15, 0.10, 4.10, 0.035, 2), frame, -1.6, 0.235, 0.2);
   const sink = new THREE.Group();
-  const base = new THREE.Mesh(rbox(3.6, 0.14, 3.6, 0.02, 1), metal(0x8fa6b8, { roughness: 0.32 }));
-  sink.add(base);
-  const finMat = metal(0x9db4c6, { roughness: 0.28 });
-  for (let i = 0; i < 16; i++) {
-    const f = new THREE.Mesh(rbox(0.06, 1.0, 3.4, 0.01, 1), finMat);
-    f.position.set(-1.65 + (i / 15 - 0.5) * 3.2, 0.55, 0);
-    sink.add(f);
-  }
-  sink.position.set(-1.6, 0.24, 0.2);
-  root.add(sink);
-  parts.sink = sink;
+  sink.position.set(-1.6, 0.31, 0.2);
+  board.add(sink);
+  solid(sink, rbox(3.6, 0.14, 3.6, 0.04, 2), metal(0xbb8d63, { roughness: 0.31 }));
+  const fins = Array.from({length: 22}, (_, i) => [(i / 21 - 0.5) * 3.32, 0.55, 0]);
+  batch(sink, rbox(0.068, 0.98, 3.43, 0.017, 1), metal(0xbec4cc, { roughness: 0.30 }), fins);
+  const screws = [];
+  for (const x of [-1.92, 1.92]) for (const z of [-1.87, 1.87]) screws.push([x, 0.043, z]);
+  batch(sink, new THREE.CylinderGeometry(0.115, 0.115, 0.075, 12), frame, screws);
 
-  // 内存插槽
-  const dimmMat = new THREE.MeshPhysicalMaterial({ color: 0x101a22, metalness: 0.3, roughness: 0.5 });
+  const slots = [], sticks = [], chips = [], latches = [], chokes = [], capacitors = [];
   for (let i = 0; i < 4; i++) {
-    const d = new THREE.Mesh(rbox(0.34, 0.20, 5.2, 0.02, 1), dimmMat);
-    d.position.set(2.6 + i * 0.55, 0.16, 0.2);
-    root.add(d);
-    const m = new THREE.Mesh(rbox(0.22, 0.5, 4.9, 0.02, 1), new THREE.MeshStandardMaterial({
-      color: 0x1d3a2e, metalness: 0.4, roughness: 0.5,
-    }));
-    m.position.set(2.6 + i * 0.55, 0.42, 0.2);
-    root.add(m);
+    const x = 2.34 + i * 0.62;
+    slots.push([x, 0.16, 0.16]);
+    sticks.push([x, 0.53, 0.16]);
+    for (const side of [-1, 1]) {
+      latches.push([x, 0.28, 0.16 + side * 2.56]);
+      for (let k = 0; k < 8; k++) chips.push([x + side * 0.115, 0.56, -1.88 + k * 0.58]);
+    }
   }
+  batch(board, rbox(0.34, 0.21, 5.35, 0.04, 1), polymer, slots);
+  batch(board, rbox(0.14, 0.55, 4.92, 0.03, 1), mask, sticks);
+  batch(board, rbox(0.085, 0.31, 0.42, 0.018, 1), polymer, chips);
+  batch(board, rbox(0.36, 0.22, 0.19, 0.025, 1), frame, latches);
+  for (let i = 0; i < 9; i++) {
+    chokes.push([-3.84 + i * 0.47, 0.22, -2.52]);
+    capacitors.push([-3.84 + i * 0.47, 0.21, -3.06]);
+  }
+  batch(board, rbox(0.37, 0.29, 0.43, 0.03, 1), polymer, chokes);
+  batch(board, new THREE.CylinderGeometry(0.145, 0.15, 0.29, 16), frame, capacitors);
 
-  // VRM 元件
+  // A fan-out on the unobstructed strip between the CPU and memory sockets.
+  const traces = [];
   for (let i = 0; i < 30; i++) {
-    const c = new THREE.Mesh(rbox(0.16, 0.12, 0.16, 0.02, 1), new THREE.MeshStandardMaterial({
-      color: 0x2a3340, metalness: 0.75, roughness: 0.35,
-    }));
-    c.position.set(-4.4 + (i % 10) * 0.28, 0.1, -2.9 + Math.floor(i / 10) * 0.3);
-    root.add(c);
+    const z = -1.76 + i * 0.12;
+    const x = 0.90 + (i % 6) * 0.11;
+    const lane = [[0.58, z], [x, z], [x + 0.29, z + 0.29], [2.2, z + 0.29]];
+    for (let j = 0; j < lane.length - 1; j++) {
+      traces.push(lane[j][0], 0.066, lane[j][1], lane[j+1][0], 0.066, lane[j+1][1]);
+    }
   }
+  const traceGeometry = new THREE.BufferGeometry();
+  traceGeometry.setAttribute('position',new THREE.Float32BufferAttribute(traces, 3));
+  board.add(new THREE.LineSegments(traceGeometry, new THREE.LineBasicMaterial({color: 0x45736a})));
+  return { root, parts: { sink, board }, fade: makeFade(root), kind: 'server' };
+}
 
-  return { root, parts, fade: makeFade(root), kind: 'server' };
+function fitKeyboard(deck, keyMat, grilleMat) {
+  const single = count => Array(count).fill(1);
+  const rows = [
+    [1.3, ...single(12), 1.25],
+    [...single(13), 1.8],
+    [1.55, ...single(12), 1.25],
+    [1.8, ...single(11), 2.15],
+    [2.35, ...single(10), 2.6],
+    [1.15, 1.1, 1.2, 1.5, 5.4, 1.5, 1.1, 1, 1, 1],
+  ];
+  const keys = [], homingBars = [], perforations = [];
+  rows.forEach((row, r) => {
+    const step = 6.36 / row.reduce((a,b) => a + b, 0);
+    let x = -3.18;
+    const z = -1.57 + r * 0.355;
+    row.forEach((units, c) => {
+      const w = units * step;
+      keys.push([x+w/2, 0.234, z, w-0.045, 1, r === 0 ? 0.27 : 0.30]);
+      if (r === 3 && (c === 4 || c === 7)) homingBars.push([x+w/2, 0.271, z+0.085]);
+      x += w;
+    });
+  });
+  const keyGeometry = rbox(1, 0.072, 1, 0.032, 2);
+  const keycaps = batch(deck, keyGeometry, keyMat, keys);
+  batch(deck, rbox(0.14, 0.011, 0.029, 0.004, 1), grilleMat, homingBars);
+  for (const side of [-1,1]) {
+    for (let r = 0; r < 27; r++) {
+      for (let c = 0; c < 4; c++) perforations.push([side*(3.47+c*0.062),0.223,-1.61+r*0.074]);
+    }
+  }
+  batch(deck, new THREE.CylinderGeometry(0.017, 0.017, 0.002, 6), grilleMat, perforations);
+  return keycaps;
 }
 
 export function buildLaptop() {
   const root = new THREE.Group();
-  const parts = {};
-
+  const assembly = new THREE.Group();
+  assembly.rotation.set(0.16, -0.18, 0);
+  root.add(assembly);
   const shellMat = new THREE.MeshPhysicalMaterial({
-    color: 0x47545f, metalness: 0.80, roughness: 0.34, clearcoat: 0.55, clearcoatRoughness: 0.22,
+    color: 0xa2a6aa, metalness: 0.78, roughness: 0.33, clearcoat: 0.18, clearcoatRoughness: 0.35,
   });
+  const seam = new THREE.MeshStandardMaterial({color: 0x151b20, metalness: 0.2, roughness: 0.62});
+  const keyMat = new THREE.MeshStandardMaterial({color: 0x30343a, metalness: 0.18, roughness: 0.48});
+  const inner = new THREE.MeshStandardMaterial({color: 0x191b20, roughness: 0.46, metalness: 0.2});
 
-  // 底壳
-  const base = new THREE.Mesh(rbox(7.8, 0.22, 5.2, 0.08, 2), shellMat);
-  base.position.y = 0.11;
-  root.add(base);
+  const base = chassisPlate(assembly, 7.80, 5.16, 0.135, 0.22, 0.08, shellMat);
+  chassisPlate(assembly, 7.76, 5.12, 0.018, 0.21, 0.152, seam);
+  const deck = chassisPlate(assembly, 7.80, 5.16, 0.051, 0.22, 0.188, shellMat, [
+    [6.63, 2.22, 0, -0.68, 0.12], [2.70, 1.45, 0, 1.44, 0.095],
+  ]);
+  const keybed = chassisPlate(assembly, 6.62, 2.21, 0.026, 0.12, 0.171, seam);
+  keybed.position.z = -0.68;
+  const trackpad = chassisPlate(assembly, 2.65, 1.4, 0.042, 0.084, 0.187,
+    new THREE.MeshStandardMaterial({color: 0x93989e, metalness: 0.52, roughness: 0.44}));
+  trackpad.position.z = 1.44;
+  const keycaps = fitKeyboard(assembly, keyMat, seam);
 
-  // 键盘面
-  const deck = new THREE.Mesh(
-    new THREE.PlaneGeometry(7.4, 4.9),
-    new THREE.MeshStandardMaterial({ map: deckTexture(), roughness: 0.55, metalness: 0.35 })
-  );
-  deck.rotation.x = -Math.PI / 2;
-  deck.position.y = 0.223;
-  root.add(deck);
-
-  // 屏幕：铰链在 -Z 边
+  const hingeMat = metal(0x82898d, {roughness: 0.30});
+  const barrel = new THREE.CylinderGeometry(0.105, 0.105, 1.24, 24);
+  const bearing = new THREE.CylinderGeometry(0.11, 0.11, 0.10, 24);
+  for (const x of [-2.54,2.54]) {
+    solid(assembly, barrel, hingeMat, x, 0.256, -2.32).rotation.z = Math.PI / 2;
+    for (const dx of [-0.68,0.68]) solid(assembly, bearing, inner, x+dx, 0.256, -2.32).rotation.z = Math.PI / 2;
+  }
   const lid = new THREE.Group();
-  const lidShell = new THREE.Mesh(rbox(7.8, 4.8, 0.14, 0.06, 2), shellMat);
-  lidShell.position.set(0, 2.4, 0);
-  lid.add(lidShell);
+  lid.position.set(0, 0.256, -2.32);
+  lid.rotation.x = -0.23;
+  assembly.add(lid);
+  solid(lid, extrude(roundedRectShape(7.80,4.65,0.18), 0.095, {bevel:0.014}), shellMat, 0, 2.35, 0);
+  solid(lid, extrude(roundedRectShape(7.73,4.58,0.15), 0.034, {bevel:0.006}), inner, 0, 2.35, 0.061);
+  const wallpaper = new THREE.TextureLoader().load(new URL('../../assets/deep-field.webp', import.meta.url).href);
+  wallpaper.colorSpace = THREE.SRGBColorSpace;
+  const displayMat = new THREE.MeshBasicMaterial({map: wallpaper});
+  displayMat.color.setScalar(2.8);
+  const screen = solid(lid, new THREE.PlaneGeometry(7.39,4.16), displayMat, 0, 2.36, 0.086);
+  solid(lid, new THREE.CircleGeometry(0.044, 16), seam, 0,4.531,0.088);
+  solid(lid, new THREE.CircleGeometry(0.019, 12), metal(0x283f59, {roughness:0.21}), 0,4.531,0.090);
 
-  const screen = new THREE.Mesh(
-    new THREE.PlaneGeometry(7.1, 4.2),
-    new THREE.MeshStandardMaterial({
-      map: screenTexture(), emissive: new THREE.Color(0x2b6f9c), emissiveMap: screenTexture(),
-      emissiveIntensity: 1.15, roughness: 0.25, metalness: 0.1,
-    })
-  );
-  screen.position.set(0, 2.4, 0.075);
-  lid.add(screen);
-  parts.screen = screen;
-
-  lid.position.set(0, 0.22, -2.55);
-  lid.rotation.x = -0.18;
-  root.add(lid);
-  parts.lid = lid;
-
-  // 合上的时候用
-  parts.base = base;
-  parts.deck = deck;
-
-  return { root, parts, fade: makeFade(root), kind: 'laptop' };
+  return {root, parts: {base, deck, keycaps, trackpad, lid, screen}, fade: makeFade(root), kind: 'laptop'};
 }
