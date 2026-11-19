@@ -275,7 +275,7 @@ const _matCache = new Map();
 /** 递归设置透明度；opacity<1 时临时打开 transparent，回到 1 时关掉以恢复排序性能 */
 export function setOpacity(root, o) {
   const t = o < 0.999;
-  root.traverse((obj) => {
+  root.traverseVisible((obj) => {
     const m = obj.material;
     if (!m) return;
     const arr = Array.isArray(m) ? m : [m];

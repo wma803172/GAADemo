@@ -1,271 +1,124 @@
-/* ---------------------------------------------------------------------------
-   content.js — 全站文案与章节表
-   所有数字都来自 docs/research.md，没有一条是编的。
-   结构：[0,1] 的 progress 被切成 13 段，每段一个"beat"。
-   --------------------------------------------------------------------------- */
+// Progress ranges match the geometry and camera movement in chapters/stage.js.
+const device = (anchor, text, sub) => ({ model: 'device', anchor, text, sub });
+const stack = (anchor, text, sub) => ({ model: 'stack', anchor, text, sub });
+
+const nets = [
+  ['#f4b25e', 'VDD 供电'],
+  ['#69a7ff', 'VSS 回流'],
+  ['#61ded1', '正面信号'],
+];
 
 export const CHAPTERS = [
   {
-    id: 'hero',
-    weight: 0.050,
-    rail: null,
-    kicker: 'INTEL 18A',
-    kickerCn: '硅基之旅',
-    title: '开关越小，<br><em>世界越大</em>。',
-    lead: '1960 年，一颗晶体管有 10 微米长。<br>2026 年，18A 把它压到几十纳米，<br>顺带把电从背后送了进来。',
-    body: ['往下滚。看它怎么一路变形。'],
-    facts: [],
-    labels: [],
+    id: 'hero', weight: 0.050, kicker: 'INTEL 18A', kickerCn: '晶体管的演进',
+    title: '一颗开关，<br><em>两条线索。</em>',
+    lead: '先看栅极怎样一步步包住硅，再跟一根电源线走到芯片背面。',
+    body: ['从右边这颗平面晶体管开始。往下滚动，看同一位置上的沟道怎样改变形状。'],
   },
   {
-    id: 'planar',
-    weight: 0.080,
-    rail: { year: '1960', tag: 'PLANAR' },
-    kicker: '1960',
-    kickerCn: 'FAIRCHILD · 平面工艺',
-    title: '先把结，<br><em>藏进平面</em>。',
-    lead: '1959 年，Fairchild 的 Jean Hoerni 用一层二氧化硅把发射结盖到硅表面之下——平面工艺。第二年，它变成可以量产的晶体管。',
-    body: [
-      '栅极像一块压在沟道上的板子，只从上面控制电流；两边是源极和漏极。1971 年的 Intel 4004 就是这样：2300 个晶体管，栅长 10 微米。',
-    ],
-    facts: ['栅长 10 µm', '2300 个晶体管', 'SiO₂ 钝化'],
-    labels: [
-      { model: 'planar', anchor: 'gate', text: 'Gate', sub: '栅极' },
-      { model: 'planar', anchor: 'source', text: 'Source', sub: '源极' },
-      { model: 'planar', anchor: 'drain', text: 'Drain', sub: '漏极' },
-      { model: 'planar', anchor: 'channel', text: 'Channel', sub: '沟道' },
-    ],
+    id: 'planar', weight: 0.080, kicker: '1960', kickerCn: '平面 MOS 晶体管',
+    title: '从上面，<br><em>管住一条路。</em>',
+    lead: '两端是源极和漏极，中间能导电的区域叫沟道。给上面的栅极加电压，它就能隔着一层绝缘材料，控制沟道是否导通。',
+    body: ['1960 年，贝尔实验室的 Atalla 和 Kahng 展示了早期 MOS 晶体管。后面的变形用同一视角比较几代设计。'],
+    labels: [device('gate','栅极','控制开关'), device('source','源极','沟道的一端')],
   },
   {
-    id: 'sce',
-    weight: 0.075,
-    rail: { year: '1990s', tag: 'SCALING' },
-    kicker: '1990s–2000s',
-    kickerCn: '缩放的尽头',
-    title: '板子越短，<br><em>越关不住</em>。',
-    lead: '缩小栅长，沟道变短、电阻变小、驱动电流变大——摩尔定律靠它跑了三十年。',
-    body: [
-      '可栅极和漏极贴得越近，漏极的电场就越容易越过栅极，把源端的势垒拉低（DIBL）。亚阈值摆幅从室温极限 60 mV/dec 一路退化，该断的电流断不干净。',
-      '问题出在几何：栅极只盖住了沟道的一面。',
-    ],
-    facts: ['60 mV/dec 理论下限', 'DIBL', '一面栅控'],
-    labels: [
-      { model: 'planar', anchor: 'gate', text: 'Gate Length ↓', sub: '栅长缩短' },
-      { model: 'planar', anchor: 'channel', text: 'Short-Channel Effects', sub: '短沟道效应区' },
-    ],
+    id: 'sce', weight: 0.075, kicker: '平面结构', kickerCn: '短沟道效应',
+    title: '两端靠近，<br><em>关断变难。</em>',
+    lead: '沟道越短，漏极的电场越容易影响源极一侧。即使让栅极关掉开关，仍可能有一小股漏电流。',
+    body: ['下一代设计把硅立起来，让栅极从更多方向管住沟道。'],
+    labels: [device('channel','沟道','源极与漏极之间')],
   },
   {
-    id: 'finfet',
-    weight: 0.085,
-    rail: { year: '2011', tag: 'FINFET' },
-    kicker: '2011 · INTEL 22nm',
-    kickerCn: 'TRI-GATE',
-    title: '把沟道立起来，<br><em>包住三面</em>。',
-    lead: '2011 年 5 月，Intel 公布 22nm Tri-Gate：沟道竖起来成为鳍片，栅极跨过去，同时贴住顶面和左右两个侧壁。',
-    body: [
-      '一条沟道的有效宽度从 W 变成 2H+W。22nm 的鳍高 34 nm、鳍宽 8 nm，一条鳍就相当于 76 nm 宽的平面沟道。官方说法：低电压下性能最高提升 37%，同性能功耗不到一半。',
-    ],
-    facts: ['60 nm fin pitch', '34 nm 鳍高', '三面栅控'],
-    labels: [
-      { model: 'finfet', anchor: 'gate', text: 'Gate', sub: '跨过鳍片' },
-      { model: 'finfet', anchor: 'fin', text: 'Fin', sub: '鳍片' },
-    ],
+    id: 'finfet', weight: 0.085, kicker: '2011 · INTEL', kickerCn: '鳍式晶体管',
+    title: '硅立起来，<br><em>栅围住三面。</em>',
+    lead: '两端仍是源极和漏极。中间的硅竖成一道鳍，栅极跨过它，能同时控制鳍的顶面和两个侧壁。',
+    body: ['鳍的底部仍连着基底。Intel 在 22 nm 工艺上采用了这种 Tri-Gate 结构。'],
+    labels: [device('fin','硅鳍','竖起来的沟道')],
   },
   {
-    id: 'multifin',
-    weight: 0.085,
-    rail: { year: '2014', tag: 'MULTI-FIN' },
-    kicker: '2014 · INTEL 14nm',
-    kickerCn: '第二代 TRI-GATE',
-    title: '一个不够，<br><em>那就并排</em>。',
-    lead: '一条鳍能给的电流有上限，而设计者只能按整数条鳍加电流——驱动能力是台阶式的，不能连续调。',
-    body: [
-      '于是同一道栅极下并排 2 条或 4 条：少鳍换密度（密度库），多鳍换驱动（性能库），同一代工艺里同时存在。',
-      '14nm 把鳍做得更高更薄（42 nm），单条鳍电流变大，达到同样驱动需要的鳍数反而少了。',
-    ],
-    facts: ['42 nm fin pitch', '性能库 4 鳍', '密度库 2 鳍'],
-    labels: [
-      { model: 'multiDense', anchor: 'gate', text: '密度库', sub: '2 fins' },
-      { model: 'multiPerf', anchor: 'gate', text: '性能库', sub: '4 fins' },
-    ],
+    id: 'multifin', weight: 0.085, kicker: '2014 · 多鳍 FINFET', kickerCn: '增加并行沟道',
+    title: '一片鳍旁边，<br><em>再添几片。</em>',
+    lead: '看两端之间。多条鳍并排，各自提供一条导电路径，仍由同一道栅极控制。',
+    body: ['这里从两鳍过渡到四鳍。设计时，增加鳍数通常能让开关带动更大的负载，也会占用更多空间。'],
+    labels: [device('fin','并排的硅鳍','每条都连接源极和漏极')],
   },
   {
-    id: 'n3',
-    weight: 0.085,
-    rail: { year: '2022', tag: 'N3' },
-    kicker: '2022 · TSMC 3nm',
-    kickerCn: 'FINFLEX',
-    title: '形状越来越怪，<br><em>收益越来越薄</em>。',
-    lead: '台积电 3nm 仍然是 FinFET，但鳍片的截面已经不再是方块——栅极裹住的那一段，被做成了带斜面的「钻石」。',
-    body: [
-      '为什么是菱形：同样一条鳍，菱形的四个面比矩形多出一圈有效宽度，栅极能抓住的面积更大；斜面还让电场分布更均匀。代价是形状由晶面决定，工艺窗口很窄。',
-      '而且鳍不能再往上长：高宽比太大，清洗干燥时的表面张力就能把它拉倒；鳍太薄，截面变小，串联电阻又上来了。',
-      'FINFLEX 用 3-2、2-2、2-1 三种鳍数配置在同一颗芯片里分配性能与密度——三面栅已经用到头了。',
-    ],
-    facts: ['菱形截面', '3-2 / 2-2 / 2-1', '仍是 FinFET'],
-    labels: [
-      { model: 'n3', anchor: 'sd', text: 'Gate', sub: '裹住菱形段' },
-      { model: 'n3', anchor: 'fin', text: 'Diamond Section', sub: '菱形截面 · 更大有效宽度' },
-    ],
+    id: 'n3', weight: 0.085, kicker: '2022 · TSMC N3', kickerCn: '鳍数与面积',
+    title: '鳍怎么排，<br><em>也要做取舍。</em>',
+    lead: '台积电的 N3 仍采用鳍式结构。FINFLEX 提供 3–2、2–2 和 2–1 等鳍数组合，让不同单元在速度与面积之间取舍。',
+    body: ['盯住两端之间的竖鳍。接下来对照 Intel 的另一种设计：把导电的硅做成横带，一层层叠起来。'],
+    labels: [device('fin','栅下的鳍','底部连着基底')],
   },
   {
-    id: 'gaa',
-    weight: 0.085,
-    rail: { year: '2026', tag: 'RIBONFET' },
-    kicker: '2026 · INTEL 18A',
-    kickerCn: 'RIBBONFET · GAA',
-    title: '四条带子，<br><em>四面全包</em>。',
-    lead: 'RibbonFET 把沟道做成四条水平悬浮的硅带，栅极从上下左右四面全包。',
-    body: [
-      '同一块占地，栅极多控制了两个面——短沟道效应被压得更死。这才是「全环绕（gate-all-around）」的意义。',
-      '硅带宽度可以按需选（18A 给出 W2、W3 两种）：宽一点驱动强，电容也大。这是 Intel 第一个 GAA 晶体管。',
-    ],
-    facts: ['4 条 ribbon', '四面栅控', '库高 180 / 160 nm'],
-    labels: [
-      { model: 'gaa', anchor: 'gate', text: 'Gate', sub: '四面全包' },
-      { model: 'gaa', anchor: 'ribbon', text: 'Ribbon × 4', sub: '硅带' },
-      { model: 'gaa', anchor: 'sd', text: 'Source / Drain', sub: '源 / 漏' },
-    ],
+    id: 'gaa', weight: 0.085, kicker: 'INTEL 18A', kickerCn: 'RIBBONFET 环绕栅',
+    title: '四条硅带，<br><em>一个栅极。</em>',
+    lead: '看半透明栅极包住的那一段。导通时，亮点沿四条硅带连接两端。点一下关断，四条路一起停止显示流动。',
+    body: ['以 Panther Lake 为例，四层硅带上下叠放，各自隔着薄绝缘层，被同一块金属栅环绕。栅极通过电场控制沟道。'],
+    labels: [device('gate','共用栅极','半透明剖视')],
+    gateControl: true,
   },
   {
-    id: 'front',
-    weight: 0.075,
-    rail: { year: 'M1–M6', tag: 'INTERCONNECT' },
-    kicker: '互连',
-    kickerCn: '正面 · FRONT SIDE',
-    title: '电和信号，<br><em>挤在同一面</em>。',
-    lead: '晶体管之上是十几层金属。电源得从最上面那两层粗线出发，一层层往下穿过通孔，才能碰到源极。',
-    body: [
-      '信号线也在同一片空间里抢位置。越靠近器件，线越细、电阻越大——电压就在路上掉掉了（IR drop）。',
-    ],
-    facts: ['铜互连', 'IR Drop', '布线拥塞'],
-    labels: [
-      { model: 'stack', anchor: 'signals', text: 'Signal', sub: '信号线' },
-      { model: 'stack', anchor: 'rail', text: 'Power Rail', sub: '电源线' },
-    ],
+    id: 'front', weight: 0.075, kicker: '正面互连', kickerCn: '传统供电',
+    title: '电和信号，<br><em>曾走同一面。</em>',
+    lead: '从晶体管往上看，是一层层金属线。靠外的粗线负责远距离分配，靠里的细线把连接分给一个个器件。',
+    body: ['相邻层可以沿不同方向布线。线从上面跨过去时仍然绝缘，只有在接了竖直通孔的位置才会连通。'],
+    legend: nets, labels: [stack('signals','正面互连','细线靠近器件')],
   },
   {
-    id: 'split',
-    weight: 0.075,
-    rail: { year: 'BS-PDN', tag: 'SPLIT' },
-    kicker: '重新排布',
-    kickerCn: '把电源分到背面',
-    title: '让电源，<br><em>搬到背面去</em>。',
-    lead: '把整个供电网络挪到硅片背面。正面剩下的空间全给信号：线可以更粗、间距可以更松。',
-    body: [
-      '背面粗线走最短路径直达器件，电阻和电感都小了。Intel 的数字：最坏情况动态电压跌落改善约 10 倍，已布线逻辑块面积压缩 6%–11%。',
-    ],
-    facts: ['10× droop', '6–11% 面积', '8–10% 布线收敛'],
-    labels: [
-      { model: 'stack', anchor: 'signals', text: 'Signal only', sub: '只剩信号' },
-      { model: 'stack', anchor: 'rail', text: 'Backside Power', sub: '背面供电' },
-    ],
+    id: 'split', weight: 0.075, kicker: '背面供电', kickerCn: '两种布局对照',
+    title: '信号留在正面，<br><em>电从背面来。</em>',
+    lead: '以器件层为界。上面留出空间走信号，下面铺开两张彼此绝缘的电网，分别承担供电和回流。',
+    body: ['电源线可以更粗，电压沿途损失也能更小。Intel 在特定已布线设计中报告，最坏情况下的动态电压跌落约为传统正面供电的十分之一。'],
+    legend: nets, labels: [stack('rail','背面电源线','通往局部供电接点')],
   },
   {
-    id: 'powervia',
-    weight: 0.062,
-    rail: { year: 'TSV', tag: 'POWERVIA' },
-    kicker: 'POWERVIA',
-    kickerCn: '背面供电',
-    title: '打个孔，<br><em>从背后插进来</em>。',
-    lead: '关键是一个叫 nano-TSV 的小孔。它在正面做完器件时就埋进硅里；整片键合到载片上、翻过来、磨薄，直到孔的尖端露出来。',
-    body: [
-      '背面金属接上去，电就从背后直接进到晶体管的源漏——每个标准单元都有一个这样的孔。',
-      '代价是双面对准与晶圆减薄；省下的是正面的掩膜和工艺步数（在最低两层布线层上最多少 44% 掩膜、42% 步数）。',
-    ],
-    facts: ['nano-TSV', '键合 + 减薄', '双面对准'],
-    labels: [
-      { model: 'stack', anchor: 'device', text: 'RibbonFET', sub: '器件' },
-    ],
+    id: 'powervia', weight: 0.062, kicker: 'POWERVIA', kickerCn: '从线网到器件',
+    title: '沿一根金线，<br><em>找它的落点。</em>',
+    lead: '背面电源由粗线分到细线，再经过预先埋在硅中的小通孔。青绿色的输入信号则沿正面布线去控制栅极。',
+    body: ['制造时，正面器件和布线完成后，晶圆贴到支撑片上再翻面、磨薄，露出预埋的孔端，随后接上背面金属。'],
+    legend: nets, labels: [stack('device','器件层','两侧布线在这里各接各的端点')],
   },
   {
-    id: 'via',
-    weight: 0.043,
-    rail: { year: 'TSV', tag: 'CONTACT' },
-    kicker: 'POWERVIA · 放大',
-    kickerCn: '一个标准单元的正下方',
-    title: '每一颗开关，<br><em>都有自己一个孔</em>。',
-    lead: '把镜头推到器件正下方：一排发光的细柱，就是 nano-TSV。',
-    body: [
-      '正面堆信号，背面送电，中间只靠这几十纳米宽的柱子相连。距离短了，电阻和电感都小，电压才掉得少。',
-    ],
-    facts: ['每单元一个 TSV', '间距 = 标准单元', '电从背面来'],
-    labels: [
-      { model: 'stack', anchor: 'tsv', text: 'nano-TSV', sub: '硅通孔阵列' },
-    ],
+    id: 'via', weight: 0.043, kicker: 'POWERVIA', kickerCn: '器件侧接剖视',
+    title: '从侧面接电，<br><em>从上面接信号。</em>',
+    lead: '看金色通孔顶端的小横接头。它接到一只晶体管的源极接点。青绿色信号线从上方接到栅极，蓝色回流支路连着相邻器件。',
+    body: ['这里放大的是同一片线网。亮点标出各自的路线，埋在硅里的金属通孔始终在原位。'],
+    legend: nets, labels: [stack('sideContact','侧接头','通向源极'), stack('sigGate','栅极接点','正面输入信号')],
   },
   {
-    id: 'return',
-    weight: 0.018,
-    rail: { year: 'DIE', tag: 'WHOLE' },
-    kicker: '退回来',
-    kickerCn: '上下合起来，才是一颗芯粒',
-    title: '一个单元是这样，<br><em>一整颗呢</em>。',
-    lead: '把这套结构重复几十亿次，才是芯片。',
-    body: [],
-    facts: [],
-    labels: [],
+    id: 'return', weight: 0.018, kicker: '互连全景', kickerCn: '拉回视角',
+    title: '一处接点，<br><em>连着整片线网。</em>',
+    lead: '刚才追过的金色支路又回到整片电网中。青绿色信号线和背面电网仍分居器件两侧。',
+    legend: nets,
   },
   {
-    id: 'macro',
-    weight: 0.072,
-    rail: { year: '10⁹×', tag: 'SCALE' },
-    kicker: '尺度',
-    kickerCn: '一路拉远',
-    title: '从一颗开关，<br><em>到一台电脑</em>。',
-    lead: '一颗 RibbonFET 是纳米级的。把它放大十亿倍，你会看到一颗芯粒、一颗封装好的处理器、一块主板，和一台机器。',
-    body: [],
-    facts: [],
-    labels: [],
+    id: 'macro', weight: 0.072, kicker: '尺度', kickerCn: '从器件到系统',
+    title: '从一颗开关，<br><em>到一台电脑。</em>',
+    lead: '许多晶体管组成电路，电路组成芯粒。芯粒装进封装，再装到主板上，就进入了我们能拿在手里的机器。',
   },
   {
-    id: 'products',
-    weight: 0.060,
-    rail: { year: '2026', tag: 'PRODUCTS' },
-    kicker: '2026 · 已经量产',
-    kickerCn: '搭载 18A 的产品',
-    title: '现在，它在<br><em>这些机器里</em>。',
-    lead: 'Panther Lake（Core Ultra 系列 3）是第一个 18A 平台，2026 年 1 月发布，计算芯粒用 18A 制造。',
-    body: [
-      'Xeon 6+ 是第一个 18A 服务器 CPU：最多 288 个能效核、576 MB LLC、12 通道 DDR5-8000。',
-      '同一套 RibbonFET + PowerVia，从一颗开关一直铺到整个机架。',
-    ],
-    facts: ['Core Ultra Series 3', 'Xeon 6+ · 288C', '18A · 量产'],
-    labels: [],
+    id: 'products', weight: 0.060, kicker: 'INTEL 18A', kickerCn: '从笔记本到服务器',
+    title: '走进真实的<br><em>处理器。</em>',
+    lead: 'Core Ultra 系列 3 的 Panther Lake 计算芯粒采用 Intel 18A。前面看到的环绕栅和背面供电，都用在这块芯粒里。',
+    body: ['在服务器里，Clearwater Forest（Xeon 6+）也采用 18A，最高配置有 288 个能效核。同一封装里的其他芯粒可以采用不同工艺。'],
   },
   {
-    id: 'outro',
-    weight: 0.030,
-    rail: null,
-    kicker: 'INTEL 18A',
-    kickerCn: 'RIBONFET + POWERVIA',
-    title: '',
-    lead: '',
-    body: [],
-    facts: [],
-    labels: [],
-    outro: true,
+    id: 'outro', weight: 0.030, kicker: 'INTEL 18A', kickerCn: 'RIBBONFET + POWERVIA', title: '', outro: true,
   },
 ];
 
-/* 把 weight 归一化成 [start, end] */
-let acc = 0;
-for (const ch of CHAPTERS) {
-  ch.start = acc;
-  acc += ch.weight;
-  ch.end = acc;
+let progress = 0;
+for (const chapter of CHAPTERS) {
+  chapter.start = progress;
+  progress += chapter.weight;
+  chapter.end = progress;
 }
 CHAPTERS[CHAPTERS.length - 1].end = 1;
 
 export function chapterAt(p) {
-  const t = Math.min(Math.max(p, 0), 0.999999);
-  for (let i = 0; i < CHAPTERS.length; i++) {
-    const ch = CHAPTERS[i];
-    if (t >= ch.start && t < ch.end) {
-      return { index: i, chapter: ch, u: (t - ch.start) / (ch.end - ch.start) };
-    }
-  }
-  const i = CHAPTERS.length - 1;
-  const ch = CHAPTERS[i];
-  return { index: i, chapter: ch, u: 1 };
+  const index = CHAPTERS.findIndex(chapter => p < chapter.end);
+  const i = index === -1 ? CHAPTERS.length - 1 : Math.max(0, index);
+  const chapter = CHAPTERS[i];
+  return { index: i, chapter, u: (p - chapter.start) / (chapter.end - chapter.start) };
 }

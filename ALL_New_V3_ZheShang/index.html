@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#04070b" />
-<title>Intel 18A · 从一颗开关到一台电脑</title>
+<title>Intel 18A · 沟道与背面供电</title>
 <meta name="description" content="沿着晶体管七十年的变形记，从平面到 FinFET，从 3nm 到 RibbonFET，再翻到芯片背面看 PowerVia 供电。" />
 <link rel="icon" href="./assets/mark.svg" type="image/svg+xml" />
 <link rel="stylesheet" href="./src/styles.css" />
@@ -30,8 +30,13 @@
       </span>
       <span class="brand-text"><b>Intel 18A</b><i>硅基之旅</i></span>
     </div>
+    <nav class="chapter-nav" aria-label="跳到展示段落">
+      <a href="?t=0.10" data-t="0.10">器件演变</a>
+      <a href="?t=0.517" data-t="0.517">环绕栅</a>
+      <a href="?t=0.726" data-t="0.726">背面供电</a>
+    </nav>
     <div class="topbar-right">
-      <span class="chapter-count" id="chapter-count">01 / 12</span>
+      <span class="chapter-count" id="chapter-count">01 / 15</span>
       <button class="icon-btn" id="btn-quality" type="button" title="画质">高</button>
       <button class="icon-btn" id="btn-full" type="button" title="全屏">
         <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 6V2h4M14 10v4h-4M2 10v4h4M14 6V2h-4"/></svg>
@@ -42,14 +47,9 @@
 
   <main id="story" class="story"><!-- chapters injected --></main>
 
-  <div class="hud-rail" id="rail" aria-hidden="true"></div>
   <div class="label-layer" id="labels" aria-hidden="true"></div>
 
-  <div class="scalebar" id="scalebar" aria-hidden="true">
-    <div class="scalebar-track"><i id="scalebar-fill"></i></div>
-    <span class="scalebar-label" id="scalebar-label">10 µm</span>
-    <span class="scalebar-hint" id="scalebar-hint">非等比例</span>
-  </div>
+  <div class="model-note">结构示意 · 非等比例</div>
 
   <div class="hint" id="hint">
     <span class="hint-arrow" aria-hidden="true"></span>

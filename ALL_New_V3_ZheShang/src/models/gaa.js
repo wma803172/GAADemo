@@ -1,155 +1,172 @@
-/* ---------------------------------------------------------------------------
-   gaa.js — Intel RibbonFET（GAA，2026 主角）
-   四条水平硅带，一条栅极把它们四个全部裹住。
-   为了让观众"看见"那多出来的接触面积：
-     · 栅极是半透明玻璃
-     · 硅带外面套一层会发光的栅介质，只在栅极下面亮
-     · 电子沿着硅带从源极跑到漏极
-   坐标约定：硅带沿 Z 走（电流方向），栅极沿 Z 有 gateLen 的宽度，
-             在 X-Y 平面上一刀切下去是"一个带圆角的长方框里挖四条缝"。
-   --------------------------------------------------------------------------- */
 import * as THREE from 'three';
-import { rbox, extrude, roundedRectShape, roundedRectPath, diamondLensGeometry } from './geo.js';
-import { silicon, channel, oxide, metal, gateGlass, rim, energyFlow, particlePoints } from '../scene/materials.js';
+import { rbox, extrude, roundedRectShape, roundedRectPath } from './geo.js';
+import { silicon, channel, metal, gateGlass } from '../scene/materials.js';
 import { anchor, makeFade } from './common.js';
-import { rand } from '../core/util.js';
 
-const RIBBON_W = 1.9;      // X 方向：ribbon 宽度（设计可调，决定驱动电流）
-const RIBBON_T = 0.16;     // Y 方向：ribbon 厚度
-const RIBBON_GAP = 0.42;   // ribbon 间距
-const RIBBON_N = 4;
-const RIBBON_L = 6.6;      // Z 方向：长度
+const RIBBON_W = 1.9;
+const RIBBON_T = 0.16;
+const PITCH = 0.58;
+const RIBBON_L = 6.6;
 const STI_TOP = 0.36;
 
+// The pulse is shaded onto the silicon itself. Its coordinates follow the
+// device when it changes shape or the viewer rotates it. Oxide and gate metal
+// never receive this material.
+function activeSilicon(uniforms, layer) {
+  const mat = channel({ color: 0xd99752, extra: {
+    roughness: 0.39, metalness: 0.26, clearcoat: 0.22,
+    emissive: 0x492510, emissiveIntensity: 0.3,
+  } });
+  mat.onBeforeCompile = (shader) => {
+    Object.assign(shader.uniforms, uniforms, { layerPhase: { value: layer * 0.19 } });
+    shader.vertexShader = 'varying vec3 siliconPos;\n' + shader.vertexShader.replace(
+      '#include <begin_vertex>', '#include <begin_vertex>\nsiliconPos = position;'
+    );
+    shader.fragmentShader = [
+      'varying vec3 siliconPos;',
+      'uniform float carrierTime, conduction, drainField, layerPhase;',
+      shader.fragmentShader,
+    ].join('\n').replace('#include <emissivemap_fragment>', `
+      #include <emissivemap_fragment>
+      float z = siliconPos.z / ${RIBBON_L.toFixed(2)};
+      float x = siliconPos.x / ${RIBBON_W.toFixed(2)};
+      float y = siliconPos.y / ${RIBBON_T.toFixed(2)};
+      float phase = fract(z * 4.5 - carrierTime * 0.93 + layerPhase);
+      float head = 1.0 - smoothstep(0.025, 0.14, abs(phase - 0.58));
+      float tail = smoothstep(0.14, 0.55, phase) * (1.0 - smoothstep(0.55, 0.59, phase));
+      float top = 1.0 - smoothstep(0.035, 0.12, abs(abs(x) - 0.27));
+      float side = (1.0 - smoothstep(0.045, 0.26, abs(y))) * smoothstep(0.43, 0.49, abs(x));
+      float path = max(top, side) * (1.0 - smoothstep(0.40, 0.48, abs(z)));
+      float gateRegion = 1.0 - smoothstep(0.07, 0.12, abs(z));
+      totalEmissiveRadiance += vec3(1.0,0.89,0.63) * conduction * path *
+          (0.09 + 2.15 * head + 0.35 * tail) * (1.0 + 0.38 * gateRegion);
+      totalEmissiveRadiance += vec3(0.72,0.12,0.035) * drainField *
+          smoothstep(-0.16, 0.25, z) * (1.0 - smoothstep(0.29,0.41,z));
+    `);
+  };
+  return mat;
+}
+
+function staticGlass(hex, opacity) {
+  const mat = gateGlass({ color: hex, opacity, extra: { side: THREE.FrontSide } });
+  mat.userData.baseOpacity = opacity;
+  return mat;
+}
+
+function makeGate(n, cy, bottom, gateLen, gateOuterW, gateOuterH) {
+  const root = new THREE.Group();
+  const film = new THREE.Group();
+  const outer = roundedRectShape(gateOuterW, gateOuterH, 0.15);
+  const filmShape = roundedRectShape(RIBBON_W + 0.15, RIBBON_T + 0.15, 0.085);
+  filmShape.holes.push(roundedRectPath(RIBBON_W, RIBBON_T, 0.025));
+  const filmGeometry = extrude(filmShape, gateLen + 0.04, { bevel: 0, curveSegments: 7 });
+  const filmMat = staticGlass(0x91d6d8, 0.27);
+  for (let i = 0; i < n; i++) {
+    const y = bottom + i * PITCH;
+    const hole = roundedRectPath(RIBBON_W + 0.154, RIBBON_T + 0.154, 0.085);
+    const points = hole.getPoints(9).map(pt => new THREE.Vector2(pt.x, pt.y + y - cy));
+    outer.holes.push(new THREE.Path(points));
+    const dielectric = new THREE.Mesh(filmGeometry, filmMat);
+    dielectric.position.y = y;
+    dielectric.renderOrder = 2;
+    film.add(dielectric);
+  }
+  const geometry = extrude(outer, gateLen, { bevel: 0.008, bevelSegments: 1, curveSegments: 7 });
+  const body = new THREE.Mesh(geometry, staticGlass(0xb1e3ee, 0.26));
+  body.position.y = cy;
+  body.renderOrder = 3;
+  root.add(body, film);
+
+  // A narrow metal section at the back of the transparent cutaway makes the
+  // four openings and the continuity of the surrounding gate easy to read.
+  const section = new THREE.Mesh(extrude(outer, 0.045, { bevel: 0 }), metal(0x98c3cd, {
+    roughness: 0.35, extra: { metalness: 0.54, emissive: 0x17363e, emissiveIntensity: 0.28 },
+  }));
+  section.position.set(0, cy, -gateLen / 2 + 0.015);
+  root.add(section);
+  const edge = new THREE.LineSegments(new THREE.EdgesGeometry(geometry, 38),
+    new THREE.LineBasicMaterial({ color: 0xb4e9ef, transparent: true, opacity: 0.32, depthWrite: false }));
+  edge.material.userData.baseOpacity = 0.32;
+  edge.position.y = cy;
+  edge.renderOrder = 4;
+  root.add(edge);
+  return { root, body };
+}
+
+function makeTerminal(root, dir, sdZ, cy, stackHeight) {
+  const epi = new THREE.Shape();
+  epi.moveTo(-0.83, -0.50);
+  epi.lineTo(-1.125, -0.33);
+  epi.lineTo(-1.125, 0.32);
+  epi.lineTo(-0.91, 0.50);
+  epi.lineTo(0.91, 0.50);
+  epi.lineTo(1.125, 0.32);
+  epi.lineTo(1.125, -0.33);
+  epi.lineTo(0.83, -0.50);
+  epi.closePath();
+  const end = new THREE.Group();
+  const terminal = new THREE.Mesh(extrude(epi, 0.95, { bevel: 0.015, bevelSegments: 1 }),
+    channel({ color: 0xc4895c, extra: { roughness: 0.48, metalness: 0.3 } }));
+  terminal.scale.y = stackHeight;
+  const cap = new THREE.Mesh(rbox(RIBBON_W + 0.6, 0.12, 0.95, 0.035, 2), metal(0xc89c76, {
+    roughness: 0.34, extra: { metalness: 0.65, emissive: 0x42281c, emissiveIntensity: 0.22 },
+  }));
+  cap.name = 'sourceDrainContact';
+  cap.position.y = stackHeight / 2 + 0.05;
+  end.position.set(0, cy, dir * sdZ);
+  end.add(terminal, cap);
+  root.add(end);
+  return end;
+}
+
 export function buildGAA(opts = {}) {
-  const n = opts.ribbons ?? RIBBON_N;
+  const n = opts.ribbons ?? 4;
   const gateLen = opts.gateLen ?? 1.15;
   const root = new THREE.Group();
-  const parts = { ribbons: [], contactShells: [], particles: [] };
-  const anchors = {};
-
-  const pitchY = RIBBON_T + RIBBON_GAP;
   const stackBottom = STI_TOP + 0.62;
-  const stackTop = stackBottom + (n - 1) * pitchY + RIBBON_T;
+  const stackTop = stackBottom + (n - 1) * PITCH + RIBBON_T;
   const cy = (stackBottom + stackTop) / 2;
-
-  /* ---- 衬底 -------------------------------------------------------- */
-  const sub = new THREE.Mesh(rbox(7.6, 1.0, 7.4, 0.06, 3), silicon({ color: 0x1c2a38 }));
-  sub.position.y = -0.5;
-  root.add(sub);
-  parts.substrate = sub;
-
-  const plinth = new THREE.Mesh(
-    rbox(8.6, 0.4, 8.2, 0.08, 2),
-    silicon({ color: 0x0a1219, roughness: 0.6, metalness: 0.3 })
-  );
-  plinth.position.y = -1.2;
-  root.add(plinth);
-
-  const sti = new THREE.Mesh(rbox(6.2, STI_TOP, 6.6, 0.04, 2), oxide({ color: 0x0f1c28 }));
-  sti.position.y = STI_TOP / 2;
-  root.add(sti);
-  parts.sti = sti;
-
-  /* ---- 四条硅带 ----------------------------------------------------- */
-  const ribbonGeo = rbox(RIBBON_W, RIBBON_T, RIBBON_L, 0.018, 2);
-  for (let i = 0; i < n; i++) {
-    const y = stackBottom + i * pitchY;
-    const r = new THREE.Mesh(ribbonGeo, channel({ color: 0xf0dcbb }));
-    r.position.y = y;
-    root.add(r);
-    parts.ribbons.push(r);
-
-    const sh = new THREE.Mesh(ribbonGeo, rim(0xa8ecff, { power: 3.6, strength: 0.35 }));
-    sh.position.y = y;
-    sh.scale.set(1.02, 1.10, 1.004);
-    root.add(sh);
-
-    // 端部垫块：让硅带"长"在源漏上
-    for (const dir of [-1, 1]) {
-      const b = new THREE.Mesh(rbox(RIBBON_W + 0.05, RIBBON_T + 0.06, 0.5, 0.04, 2), channel({ color: 0xdcc7a4, metalness: 0.4 }));
-      b.position.set(0, y, dir * (RIBBON_L / 2 - 0.2));
-      root.add(b);
-    }
-  }
-
-  /* ---- 栅极：一个挖了四条缝的块，沿 Z 拉伸 --------------------------- */
   const gateOuterW = RIBBON_W + 0.66;
   const gateOuterH = stackTop - stackBottom + 0.66;
-  const outer = roundedRectShape(gateOuterW, gateOuterH, 0.22);
-  for (let i = 0; i < n; i++) {
-    // 洞的位置以 shape 中心为原点
-    const hy = (stackBottom + i * pitchY) - cy;
-    const hole = roundedRectPath(RIBBON_W + 0.22, RIBBON_T + 0.22, (RIBBON_T + 0.22) * 0.5);
-    // Path 不能直接平移：重建时把顶点挪过去
-    const pts = hole.getPoints(12).map((p) => new THREE.Vector2(p.x, p.y + hy));
-    const hole2 = new THREE.Path(pts);
-    outer.holes.push(hole2);
-  }
-  const gateGeo = extrude(outer, gateLen, { bevel: 0.012, bevelSegments: 2, curveSegments: 6 });
-  const gate = new THREE.Group();
-  const gBody = new THREE.Mesh(gateGeo, gateGlass({ color: 0xc4f2ff, opacity: 0.15 }));
-  gBody.position.y = cy;
-  gate.add(gBody);
-
-  const gShell = new THREE.Mesh(gateGeo, rim(0x8ce9ff, { power: 2.6, strength: 0.42 }));
-  gShell.position.y = cy;
-  gShell.scale.set(1.008, 1.008, 1.02);
-  gate.add(gShell);
-
-  root.add(gate);
-  parts.gate = gate;
-  parts.gateBody = gBody;
-
-  /* ---- 栅介质：每条硅带外面一层发光的管 ----------------------------- */
-  const contactGeo = extrude(
-    (() => {
-      const s = roundedRectShape(RIBBON_W + 0.20, RIBBON_T + 0.20, (RIBBON_T + 0.20) * 0.5);
-      s.holes.push(roundedRectPath(RIBBON_W + 0.02, RIBBON_T + 0.02, (RIBBON_T + 0.02) * 0.5));
-      return s;
-    })(),
-    gateLen + 0.02,
-    { bevel: 0.004, bevelSegments: 1 }
-  );
-
-  for (let i = 0; i < n; i++) {
-    const y = stackBottom + i * pitchY;
-    const mat = energyFlow({ color: 0x9df4ff, density: 3.4, speed: 1.05, opacity: 0.0, rimOnly: 0.10, axis: [0, 0, 1] });
-    const m = new THREE.Mesh(contactGeo, mat);
-    m.position.y = y;
-    m.renderOrder = 2;
-    root.add(m);
-    parts.contactShells.push(m);
-    parts.particles.push(null);
-  }
-
-  /* ---- 源 / 漏：把四条带子收进两块外延 --------------------------------- */
   const sdZ = RIBBON_L / 2 - 0.5;
-  for (const dir of [-1, 1]) {
-    const epi = new THREE.Mesh(
-      rbox(RIBBON_W + 0.35, stackTop - stackBottom + 0.45, 0.95, 0.05, 2),
-      channel({ color: 0xd9c39b, metalness: 0.45, roughness: 0.26 })
-    );
-    epi.position.set(0, cy, dir * sdZ);
-    root.add(epi);
 
-    const cap = new THREE.Mesh(
-      rbox(RIBBON_W + 0.6, 0.12, 0.95, 0.03, 2),
-      metal(0xcf9354, { roughness: 0.3 })
-    );
-    cap.position.set(0, cy + (stackTop - stackBottom + 0.45) / 2 + 0.05, dir * sdZ);
-    root.add(cap);
+  const base = new THREE.Group();
+  const substrate = new THREE.Mesh(rbox(7.6, 1.0, 7.4, 0.08, 2), silicon({ color: 0x293b4a }));
+  substrate.position.y = -0.50;
+  const plinth = new THREE.Mesh(rbox(8.0, 0.21, 7.80, 0.06, 2), silicon({ color: 0x14232f }));
+  plinth.position.y = -1.12;
+  const sti = new THREE.Mesh(rbox(6.65, STI_TOP, 6.88, 0.036, 2),
+    silicon({ color: 0x30424c, extra: { roughness: 0.6, metalness: 0.2 } }));
+  sti.position.y = STI_TOP / 2;
+  base.add(substrate, plinth, sti);
+  root.add(base);
+
+  const uniforms = { carrierTime: { value: 0 }, conduction: { value: 0 }, drainField: { value: 0 } };
+  const ribbons = [];
+  // The silicon enters each terminal and ends inside it, away from the
+  // outer contact face even when its edges taper.
+  const ribbonGeometry = rbox(RIBBON_W, RIBBON_T, RIBBON_L - 0.22, 0.032, 2);
+  for (let i = 0; i < n; i++) {
+    const ribbon = new THREE.Mesh(ribbonGeometry, activeSilicon(uniforms, i));
+    ribbon.position.y = stackBottom + i * PITCH;
+    root.add(ribbon);
+    ribbons.push(ribbon);
   }
-
-  /* ---- 标签锚点 ----------------------------------------------------- */
-  anchors.gate = anchor(gate, 0, cy + gateOuterH / 2 + 0.1, 0, 'gate');
-  anchors.ribbon = anchor(root, RIBBON_W / 2, stackTop, 2.2, 'ribbon');
-  anchors.sd = anchor(root, 0, cy, sdZ + 0.8, 'sd');
-
-  const fade = makeFade(root);
-
+  const gate = makeGate(n, cy, stackBottom, gateLen, gateOuterW, gateOuterH);
+  root.add(gate.root);
+  const terminals = [-1,1].map(dir => makeTerminal(root, dir, sdZ, cy, stackTop - stackBottom + 0.45));
+  const parts = { gate: gate.root, gateBody: gate.body, ribbons, terminals, substrate, plinth, sti, base };
+  const anchors = {
+    gate: anchor(root, 0, cy + gateOuterH / 2, 0, 'gate'),
+    ribbon: anchor(root, RIBBON_W / 2, stackTop, 1.40, 'ribbon'),
+    sd: anchor(terminals[1], 0, (stackTop - stackBottom + 0.45) / 2 + 0.12, 0, 'sd'),
+    source: anchor(terminals[0], 0, (stackTop - stackBottom + 0.45) / 2 + 0.12, 0, 'source'),
+  };
+  anchors.drain = anchors.sd;
   return {
-    root, parts, anchors, fade, kind: 'gaa',
-    metrics: { cy, stackBottom, stackTop, gateLen, gateOuterW, gateOuterH, sdZ, RIBBON_W, RIBBON_T, RIBBON_L },
+    root, parts, anchors, fade: makeFade(root), kind: 'gaa',
+    metrics: { cy, stackBottom, stackTop, gateLen, gateOuterW, gateOuterH, sdZ, RIBBON_W, RIBBON_T, RIBBON_L, pitch: PITCH, stiTop: STI_TOP },
+    setConduction(strength, time) { uniforms.conduction.value = strength; uniforms.carrierTime.value = time; },
+    setDrainField(strength) { uniforms.drainField.value = strength; },
   };
 }

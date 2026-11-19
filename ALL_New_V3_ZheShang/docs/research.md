@@ -299,9 +299,9 @@
 
 | 项目 | 传统（FS-PDN，前段供电） | PowerVia（BS-PDN，背面供电） | 置信度 |
 |---|---|---|---|
-| 电源网络位置 | 与信号线**共用**正面（frontside）金属层 | 全部移到**背面（backside）** | [CONFIRMED] |
-| 连接方式 | 正面金属 → via → 器件 | **nano-TSV**（nano-scale through-silicon via）**嵌入每一个标准单元**，直接从背面接到晶体管源/漏 | [CONFIRMED]（官方："embeds nano-scale through-silicon vias (nano-TSVs) in every standard cell"） |
-| 正面金属用途 | 电源 + 信号混排，拥塞 | 只跑信号 → 可**放宽信号线间距**、用更厚的线 | [CONFIRMED] |
+| 电源网络位置 | 与信号线共用正面金属层 | 主要供电网络、粗间距电源金属和凸块置于背面 | [CONFIRMED] |
+| 连接方式 | 正面金属 → via → 器件 | 各标准单元内嵌有 nano-TSV，连通背面电源金属与本地源漏触点；通孔数目取决于布局 | [CONFIRMED]（Intel 技术简报图 2；Panther Lake 实物剖面） |
+| 正面金属用途 | 电源 + 信号混排，拥塞 | 释放走线空间给信号，部分层可放宽金属间距 | [CONFIRMED] |
 | 粗间距金属/凸块 | 在正面 | 移到背面 | [CONFIRMED] |
 
 ### 6.2 制造流程（关键工艺步骤）
@@ -315,8 +315,7 @@
 | 5 | 在背面做背面金属层（backside power metal）与凸块 | [CONFIRMED] |
 | 6 | 背面光刻必须与正面图形**对准（two-sided alignment / overlay）** | [CONFIRMED]（工艺必然要求）；具体 overlay 规格 **未公开** [UNCERTAIN] |
 
-> 官方/权威描述："Intel forms nano-TSVs from the front, finishes signal wiring, and bonds that face to a carrier. It flips and thins the wafer to reveal the via tips, then builds backside power metal."
-> 来源：<https://www.intel.com/content/www/us/en/foundry/process/18a.html>（nano-TSV 定义）；SemiAnalysis 拆解（X 帖，二手）<https://x.com/SemiAnalysis_/status/2107607092311797905>；工艺综述 <https://chipscalereview.com/wp-content/uploads/2024/08/Chip-Scale-Review_July-August_2024-digital.pdf>
+Intel 的结构图标出了正面互连、器件和背面互连三个区域。Panther Lake 实物剖面进一步显示，窄通孔沿本地源漏触点侧边延伸，晶圆减薄后，其另一端接到背面金属。[Intel 18A 技术简报，图 2](https://www.intel.com/content/dam/www/central-libraries/us/en/documents/2026-06/foundry-18a-technology-brief.pdf) · [Panther Lake 实物拆解](https://newsletter.semianalysis.com/p/intel-panther-lake-teardown)
 
 ### 6.3 收益（官方数字，按时间分层）
 
@@ -425,7 +424,7 @@
 | **DIBL** | Drain-Induced Barrier Lowering | 漏压升高导致源端势垒下降、V_t 下降的效应 | mV/V | 关态漏电与输出电阻的杀手 |
 | **亚阈值摆幅** | Subthreshold Swing, SS | 使漏电流变化一个数量级所需的栅压变化 | mV/dec；室温下限 **60** | 衡量栅控能力的"体温计" |
 | **EOT** | Equivalent Oxide Thickness | 把高 K 栅介质折算成 SiO₂ 的等效厚度 | nm | 决定栅电容与短沟道控制；已接近隧穿极限 |
-| **nano-TSV** | nano-scale Through-Silicon Via | 穿透减薄后硅片、把背面电源接到器件的纳米级通孔 | 尺寸未公开 | PowerVia 的物理载体；每个标准单元一个 |
+| **nano-TSV** | nano-scale Through-Silicon Via | 穿过减薄后的硅层，把背面电源接到器件旁本地触点的纳米级通孔 | 本动画为示意比例 | PowerVia 通过标准单元中的 nano-TSV 分配电力，具体数量随布局而定 |
 | **BEOL** | Back End Of Line | 晶体管之后的金属互连层（M1 以上） | 层数 | 信号与电源走线所在；PowerVia 把电源移出 BEOL |
 | **MOL** | Middle Of Line | 晶体管与 BEOL 之间的接触层（源漏接触、栅接触） | — | 接触电阻的主要来源；18A-P 在此处做低阻接触 |
 | **PowerVia** | PowerVia | Intel 的背面供电（backside power delivery）实现 | — | 同时解决 IR drop 与布线拥塞 |

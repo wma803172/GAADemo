@@ -1,203 +1,293 @@
-/* ---------------------------------------------------------------------------
-   stack.js — 互连层与背面供电（PowerVia）
-   造型参照 Intel 18A 官方影片 0:42–0:57 / 1:11–1:17：
-     · 一根又高又窄的柱体，层与层之间横竖交替、密排，整整齐齐
-     · 电源层和信号层一开始混在同一摞里（正面）；
-       分离时，**电源层一路沉到器件下面**（背面供电），信号层向上收拢
-     · 两者之间一排发光的 nano-TSV 细柱
-   --------------------------------------------------------------------------- */
+/* A cutaway of two adjacent devices. The overview and microscope use the same
+   meshes and coordinates, including the landing points of all three nets. */
 import * as THREE from 'three';
-import { rbox } from './geo.js';
-import { silicon, metal, gateGlass, energyFlow } from '../scene/materials.js';
 import { anchor, makeFade } from './common.js';
-import { lerp } from '../core/util.js';
+import { rbox } from './geo.js';
+import { lerp, srange } from '../core/util.js';
+import { NETS, DEVICE_X, VIA_X, conductor, setAlpha, buildDeviceDetail } from '../chapters/power-detail.js';
 
-const SIGNAL = 0xe8a05a;
-const POWER = 0xd8804f;
-const LAYER_W = 5.0;
-const LAYER_D = 5.0;
+const WIDTH = 5.9;
+const DEPTH = 5.25;
+const BOX = rbox(1, 1, 1, 0.065, 1);
+const POST = new THREE.CylinderGeometry(1, 1, 1, 12);
+const matrix = new THREE.Matrix4();
+const position = new THREE.Vector3();
+const scale = new THREE.Vector3();
+const rotation = new THREE.Quaternion();
 
-/* 层的排布：从下往上，s = 信号层，p = 电源层 */
-const LAYOUT = [
-  { kind: 's', dir: 'z', n: 10, w: 0.11 },
-  { kind: 's', dir: 'x', n: 10, w: 0.11 },
-  { kind: 'p', dir: 'x', n: 2, w: 0.42 },
-  { kind: 's', dir: 'z', n: 9, w: 0.13 },
-  { kind: 's', dir: 'x', n: 9, w: 0.13 },
-  { kind: 'p', dir: 'z', n: 2, w: 0.50 },
-  { kind: 's', dir: 'z', n: 8, w: 0.15 },
-  { kind: 's', dir: 'x', n: 8, w: 0.15 },
-  { kind: 'p', dir: 'x', n: 2, w: 0.58 },
-  { kind: 's', dir: 'z', n: 7, w: 0.17 },
+function instances(group, geometry, rows, mat) {
+  if (!rows.length) return;
+  const mesh = new THREE.InstancedMesh(geometry, mat, rows.length);
+  for (let i = 0; i < rows.length; i++) {
+    const [x, y, z, w, h, d] = rows[i];
+    mesh.setMatrixAt(i, matrix.compose(position.set(x, y, z), rotation, scale.set(w, h, d)));
+  }
+  mesh.computeBoundingSphere();
+  group.add(mesh);
+}
+
+function flatTrack(start, end, width, thick) {
+  return [(start.x + end.x) / 2, 0, (start.z + end.z) / 2,
+    Math.abs(end.x - start.x) + width, thick, Math.abs(end.z - start.z) + width];
+}
+
+function interlevel(root, contacts, radius, material) {
+  const group = new THREE.Group();
+  instances(group, POST, contacts.map(p => [p.x, 0, p.z, radius, 1, radius]), material);
+  root.add(group);
+  return (y1, y2) => {
+    group.position.y = (y1 + y2) / 2;
+    group.scale.y = Math.max(0.001, Math.abs(y2 - y1));
+  };
+}
+
+// One signal net is highlighted from the frontside network all the way to a
+// gate. Other signal nets have distinct landing points and independent routes.
+function buildSignals(root) {
+  const layers = [];
+  const frontY = [1.24, 1.74, 2.19, 2.70, 3.18, 3.69];
+  const compactY = [1.05, 1.30, 1.56, 1.84, 2.16, 2.50];
+  const tracks = [[
+    { x: DEVICE_X, z: 0 }, { x: 2.29, z: 0 }, { x: 2.29, z: -1.67 },
+    { x: -1.71, z: -1.67 }, { x: -1.71, z: 1.31 }, { x: 1.94, z: 1.31 },
+    { x: 1.94, z: -2.43 },
+  ]];
+  const lanes = [
+    -2.52, -2.30, -2.04, -1.87, -1.30, -1.11, -0.88, -0.62, -0.38, -0.18,
+    0.20, 0.43, 0.65, 1.09, 1.77, 2.11, 2.50,
+  ];
+  for (let k = 0; k < lanes.length; k++) {
+    const route = [{ x: k % 2 ? -2.74 : 2.74, z: lanes[k] }];
+    for (let level = 0; level < frontY.length; level++) {
+      const xAxis = level % 2 === 0;
+      const below = route[level];
+      const lane = lanes[(k * 2 + 3 * level + 1) % lanes.length];
+      route.push(xAxis ? { x: lane, z: below.z } : { x: below.x, z: level === 5 ? (k % 2 ? 2.48 : -2.48) : lane });
+    }
+    tracks.push(route);
+  }
+
+  for (let level = 0; level < frontY.length; level++) {
+    const layer = new THREE.Group();
+    const backMat = conductor(0x609a9d, 0.28);
+    const mainMat = conductor(NETS.signal, 0.64);
+    const width = 0.06 + level * 0.012, thick = 0.064 + level * 0.008;
+    instances(layer, BOX,
+      tracks.slice(1).map(route => flatTrack(route[level], route[level + 1], width, thick)), backMat);
+    instances(layer, BOX, [flatTrack(tracks[0][level], tracks[0][level + 1], width + 0.045, thick + 0.025)], mainMat);
+    const backgroundDrops = tracks.slice(1).map(route => route[level + 1]);
+    const fgDrop = tracks[0][level + 1];
+    const drops = level + 1 === frontY.length ? [] : [
+      interlevel(root, backgroundDrops, width * 0.51, backMat),
+      interlevel(root, [fgDrop], (width + 0.04) * 0.54, mainMat),
+    ];
+    root.add(layer);
+    layers.push({ layer, drops, backMat, mainMat });
+  }
+  return {
+    layers, tracks,
+    update(split, assemble, detail, fade) {
+      layers.forEach(({ layer, backMat, mainMat }, i) => {
+        layer.position.y = lerp(frontY[i], 1.18 + i * 0.47, split);
+        layer.position.y = lerp(layer.position.y, compactY[i], assemble);
+        setAlpha(backMat, fade * (1 - 0.98 * detail));
+        setAlpha(mainMat, fade * (1 - (i === 0 ? 0 : 0.97) * detail));
+      });
+      layers.forEach(({ layer, drops }, i) => {
+        for (const place of drops) place(layer.position.y, layers[i + 1].layer.position.y);
+      });
+    },
+  };
+}
+
+// Six illustrated backside levels, paired VDD/VSS tracks on every level. The
+// sparse outer levels are wider. Vias only connect crossings of the same net.
+const POWER_LEVELS = [
+  { pick: VIA_X, other: [0.35, 0.87, 2.31], width: 0.115 },
+  { pick: 1.32, other: [0.28, 0.77, 2.21], width: 0.135 },
+  { pick: -0.72, other: [1.49, 2.37], width: 0.17 },
+  { pick: -0.78, other: [1.43, 2.16], width: 0.20 },
+  { pick: 1.76, other: [0.53], width: 0.26 },
+  { pick: 1.70, other: [0.43], width: 0.31 },
 ];
 
-const FRONT_GAP = 0.56;
-const BACK_GAP = 0.66;
+function buildPower(root, locals) {
+  const layers = POWER_LEVELS.map((config, level) => {
+    const alongZ = level % 2 === 0;
+    const layer = new THREE.Group();
+    const lines = [config.pick, ...config.other].flatMap((p, i) => {
+      const vdd = i % 2 ? -p : p;
+      return [{ at: vdd, net: 'vdd', featured: i === 0 }, { at: -vdd, net: 'vss', featured: i === 0 }];
+    });
+    const mats = {};
+    for (const net of ['vdd', 'vss']) {
+      for (const featured of [true, false]) {
+        const key = net + (featured ? 'Focus' : '');
+        const color = featured ? NETS[net] : net === 'vdd' ? 0xaa7554 : 0x516b96;
+        mats[key] = conductor(color, featured ? 0.49 : 0.32);
+        const h = 0.075 + level * 0.015;
+        const rows = lines.filter(l => l.net === net && l.featured === featured).map(l =>
+          alongZ ? [l.at, 0, 0, config.width, h, DEPTH] : [0, 0, l.at, WIDTH, h, config.width]);
+        instances(layer, BOX, rows, mats[key]);
+      }
+    }
+    const contactRails = [];
+    if (level === 0) {
+      ['vss', 'vdd'].forEach((net, index) => {
+        const { landing } = locals[index];
+        const side = net === 'vdd' ? 1 : -1;
+        const mat = conductor(NETS[net], 0.46);
+        const crossing = { x: landing.x, z: side * POWER_LEVELS[1].pick };
+        // In the cutaway, keep the actual segment between the next metal
+        // junction and its nano-via; the full-width bus recedes behind it.
+        const row = flatTrack(crossing, landing, config.width + 0.006, 0.083);
+        instances(layer, BOX, [row], mat);
+        contactRails.push(mat);
+      });
+    }
+    root.add(layer);
+    return { layer, alongZ, lines, mats, contactRails, drops: [] };
+  });
+
+  for (let i = 0; i + 1 < layers.length; i++) {
+    const below = layers[i], above = layers[i + 1];
+    for (const net of ['vdd', 'vss']) {
+      const focused = [], secondary = [];
+      const current = below.lines.filter(l => l.net === net);
+      const next = above.lines.filter(l => l.net === net);
+      current.forEach((line, j) => {
+        next.forEach((other, k) => {
+          const point = below.alongZ ? { x: line.at, z: other.at } : { x: other.at, z: line.at };
+          if (line.featured && other.featured) focused.push(point);
+          else if ((j + k + i) % 2 === 0 || j === k) secondary.push(point);
+        });
+      });
+      below.drops.push(interlevel(root, secondary, 0.054 + 0.005 * i, below.mats[net]));
+      below.drops.push(interlevel(root, focused, 0.075 + 0.007 * i, below.mats[net + 'Focus']));
+    }
+  }
+
+  return {
+    layers,
+    update(split, assemble, detail, fade) {
+      // Cross-dissolve the two wiring layouts. No conductor travels through
+      // the active silicon during the comparison.
+      const front = 1 - srange(split, 0.05, 0.48);
+      const back = srange(split, 0.48, 0.96);
+      const opacity = front + back;
+      layers.forEach(({ layer, mats, contactRails }, i) => {
+        const frontY = 4.11 + i * 0.385 + split * 0.16;
+        const backY = lerp(-0.75 - i * 0.48, -0.57 - i * 0.265, assemble);
+        layer.position.y = split < 0.48 ? frontY : backY;
+        for (const net of ['vdd', 'vss']) {
+          setAlpha(mats[net], fade * opacity * (1 - 0.98 * detail));
+          setAlpha(mats[net + 'Focus'], fade * opacity * (1 - (i === 0 ? 0.85 : 0.96) * detail));
+        }
+        contactRails.forEach(mat => setAlpha(mat, fade * opacity * detail));
+      });
+      layers.forEach(({ layer, drops }, i) => {
+        for (const place of drops) place(layer.position.y, layers[i + 1].layer.position.y);
+      });
+      return { front, back, frontY: 4.11 + split * 0.16, backY: lerp(-0.75, -0.57, assemble) };
+    },
+  };
+}
+
+// Each marker follows the selected metal and its junctions by arc length. The
+// marker denotes a route; no signal current is animated through the insulated gate.
+function powerMarkers(root, net, local) {
+  const side = net === 'vdd' ? 1 : -1;
+  const path = [];
+  for (let level = POWER_LEVELS.length - 1; level >= 0; level--) {
+    const end = side * POWER_LEVELS[level].pick;
+    const prev = level > 0 ? side * POWER_LEVELS[level - 1].pick : local.landing.z;
+    const next = level < POWER_LEVELS.length - 1 ? side * POWER_LEVELS[level + 1].pick : -side * WIDTH * 0.5;
+    for (const cross of [next, prev]) {
+      const point = level % 2 === 0 ? new THREE.Vector3(end, 0, cross) : new THREE.Vector3(cross, 0, end);
+      path.push({ point, level });
+    }
+  }
+  path.push({ point: local.landing }, { point: local.cap });
+  const lengths = new Array(path.length - 1);
+  const markerMat = new THREE.MeshBasicMaterial({ color: net === 'vdd' ? 0xffdea0 : 0xaabeff });
+  markerMat.toneMapped = false;
+  const sphere = new THREE.SphereGeometry(0.073, 12, 8);
+  const markers = [0, 1, 2].map(() => {
+    const mesh = new THREE.Mesh(sphere, markerMat);
+    root.add(mesh);
+    return mesh;
+  });
+  return (layers, time, detail, opacity) => {
+    for (const pt of path) if (pt.level !== undefined) pt.point.y = layers[pt.level].layer.position.y;
+    let total = 0, hiddenLength = 0;
+    for (let i = 0; i < path.length - 1; i++) {
+      lengths[i] = path[i].point.distanceTo(path[i + 1].point);
+      total += lengths[i];
+      if (i < path.length - 3) hiddenLength += lengths[i];
+    }
+    const head = hiddenLength * detail;
+    markers.forEach((dot, k) => {
+      dot.visible = opacity > 0.12;
+      if (!dot.visible) return;
+      const phase = (time * 0.115 + k / markers.length) % 1;
+      let distance = lerp(head, total, net === 'vss' ? 1 - phase : phase);
+      let i = 0;
+      while (i < path.length - 2 && distance > lengths[i]) distance -= lengths[i++];
+      dot.position.lerpVectors(path[i].point, path[i + 1].point, distance / (lengths[i] || 1));
+      // Place the glint at the visible skin of the conductor.
+      dot.position.x += 0.045;
+      dot.position.y += 0.054;
+      dot.scale.setScalar(1 - detail * 0.27);
+    });
+    setAlpha(markerMat, opacity);
+  };
+}
 
 export function buildStack() {
   const root = new THREE.Group();
-  const parts = { layers: [], powerLayers: [], signalLayers: [], tsvs: [] };
-  const anchors = {};
-
-  /* ---- 器件 ---------------------------------------------------------- */
-  const dev = new THREE.Group();
-  const sub = new THREE.Mesh(rbox(3.4, 0.38, 2.4, 0.03, 2), silicon({ color: 0x223142 }));
-  sub.position.y = -0.19;
-  dev.add(sub);
-  parts.substrate = sub;
-
-  const gate = new THREE.Mesh(rbox(1.7, 0.38, 0.78, 0.03, 2), gateGlass({ color: 0xbfefff, opacity: 0.26 }));
-  gate.position.y = 0.19;
-  dev.add(gate);
-  for (let i = 0; i < 4; i++) {
-    const r = new THREE.Mesh(rbox(1.4, 0.075, 1.8, 0.015, 1), new THREE.MeshStandardMaterial({
-      color: 0xd8e4ef, metalness: 0.35, roughness: 0.4,
-    }));
-    r.position.set(0, 0.055 + i * 0.11, 0);
-    dev.add(r);
-  }
-  root.add(dev);
-  parts.device = dev;
-
-  /* ---- 每层 ---------------------------------------------------------- */
-  const sigMat = metal(SIGNAL, { roughness: 0.34, extra: { emissive: new THREE.Color(0x3a1f0a), emissiveIntensity: 0.75 } });
-  const powMat = metal(POWER, { roughness: 0.40, extra: { emissive: new THREE.Color(0x3a1408), emissiveIntensity: 0.6 } });
-
-  LAYOUT.forEach((cfg, i) => {
-    const g = new THREE.Group();
-    const isPow = cfg.kind === 'p';
-    const mat = isPow ? powMat : sigMat;
-    const full = cfg.dir === 'z' ? LAYER_D : LAYER_W;
-    const len = full - 0.45;
-
-    for (let k = 0; k < cfg.n; k++) {
-      const t = cfg.n === 1 ? 0 : (k / (cfg.n - 1) - 0.5);
-      const bar = new THREE.Mesh(
-        rbox(cfg.dir === 'z' ? cfg.w : len, isPow ? 0.22 : 0.09, cfg.dir === 'z' ? len : cfg.w, 0.012, 1),
-        mat
-      );
-      if (cfg.dir === 'z') bar.position.x = t * (LAYER_W - 0.9);
-      else bar.position.z = t * (LAYER_D - 0.9);
-      g.add(bar);
-    }
-
-    // 层与层之间的小过孔，让整摞看起来是连着的
-    for (let k = 0; k < 6; k++) {
-      const via = new THREE.Mesh(rbox(0.10, 0.30, 0.10, 0.01, 1), sigMat);
-      via.position.set(
-        ((k % 3) / 2 - 0.5) * (LAYER_W - 1.6),
-        (isPow ? 0.22 : 0.09) / 2 + 0.15,
-        (Math.floor(k / 3) / 1 - 0.5) * (LAYER_D - 1.6)
-      );
-      g.add(via);
-    }
-
-    const powIdx = LAYOUT.slice(0, i).filter((c) => c.kind === 'p').length;
-    const sigIdx = LAYOUT.slice(0, i).filter((c) => c.kind === 's').length;
-    g.userData = {
-      isPow,
-      yFront: 0.72 + i * FRONT_GAP,
-      yMid: 0.62 + sigIdx * 0.44,        // 分离后信号层收拢的位置
-      yBack: -1.15 - powIdx * 0.72,      // 分离后电源层摊开在器件下面
-      yFinal: isPow                       // 合体后：紧贴器件下方
-        ? -0.58 - powIdx * 0.34
-        : 0.50 + sigIdx * 0.29,           // 合体后：紧贴器件上方（层间几乎相碰）
-    };
-    g.position.y = g.userData.yFront;
-    g.visible = false;
-    root.add(g);
-    parts.layers.push(g);
-    if (isPow) parts.powerLayers.push(g);
-    else parts.signalLayers.push(g);
+  const detailDevice = buildDeviceDetail(root);
+  const signals = buildSignals(root);
+  const power = buildPower(root, detailDevice.locals);
+  const markers = [
+    powerMarkers(root, 'vss', detailDevice.locals[0]),
+    powerMarkers(root, 'vdd', detailDevice.locals[1]),
+  ];
+  const substrateMat = new THREE.MeshStandardMaterial({
+    color: 0x426b7a, emissive: 0x142d34, emissiveIntensity: 0.65, opacity: 0.32,
+    transparent: true, depthWrite: false, roughness: 0.46, metalness: 0.18,
   });
+  const substrate = new THREE.Mesh(new THREE.BoxGeometry(WIDTH + 0.08, 0.20, DEPTH + 0.08), substrateMat);
+  substrate.position.y = -0.18;
+  root.add(substrate);
+  const edgeMat = new THREE.LineBasicMaterial({ color: 0xa3d8dc, transparent: true, opacity: 0.46 });
+  const frame = new THREE.LineSegments(new THREE.EdgesGeometry(substrate.geometry), edgeMat);
+  substrate.add(frame);
 
-  parts.frontTop = 0.72 + (LAYOUT.length - 1) * FRONT_GAP;
-
-  /* ---- nano-TSV：信号与电源之间那排细柱 ------------------------------ */
-  const tsvGeo = new THREE.CylinderGeometry(0.075, 0.075, 1, 8, 1, false);
-  parts.tsvMats = [];
-  for (let i = 0; i < 7; i++) {
-    const m = new THREE.MeshStandardMaterial({
-      color: 0xbfefff, emissive: 0x5fd8f0, emissiveIntensity: 2.2,
-      metalness: 0.3, roughness: 0.3, transparent: true, opacity: 0.95,
-    });
-    const t = new THREE.Mesh(tsvGeo, m);
-    t.position.set((i / 6 - 0.5) * (LAYER_W - 1.8), -0.5, 0);
-    t.visible = false;
-    root.add(t);
-    parts.tsvs.push(t);
-    parts.tsvMats.push(m);
+  const anchors = { ...detailDevice.anchors,
+    rail: anchor(power.layers[4].layer, POWER_LEVELS[4].pick, 0, 1.2, 'rail'),
+    returnRail: anchor(power.layers[0].layer, -VIA_X, 0, 1.8, 'returnRail'),
+    signals: anchor(signals.layers[4].layer, 1.36, 0, 1.31, 'signals'),
+  };
+  let visibility = 1;
+  root.traverse(obj => {
+    const m = obj.material;
+    if (m && m.userData.baseOpacity === undefined) {
+      m.userData.baseOpacity = m.uniforms?.uOpacity?.value ?? m.opacity;
+    }
+  });
+  const globalFade = makeFade(root);
+  function fade(value) {
+    if (value !== visibility || !root.visible) globalFade(value);
+    visibility = value;
   }
-
-  /* ---- 玻璃外壳 ------------------------------------------------------ */
-  const beolGlass = new THREE.Mesh(
-    rbox(LAYER_W + 0.4, 1, LAYER_D + 0.4, 0.03, 1),
-    new THREE.MeshPhysicalMaterial({
-      color: 0x7fc6ee, metalness: 0.0, roughness: 0.08,
-      transparent: true, opacity: 0.045, depthWrite: false,
-      side: THREE.DoubleSide, envMapIntensity: 0.7,
-    })
-  );
-  root.add(beolGlass);
-  parts.beolGlass = beolGlass;
-
-  anchors.tsv = anchor(root, 0, -0.45, 0, 'tsv');
-  anchors.rail = anchor(root, LAYER_W / 2, 1.2, 0, 'rail');
-  anchors.signals = anchor(root, 0, 3.4, 0, 'signals');
-  anchors.device = anchor(root, 0, 0.25, 0, 'device');
-
-  const fade = makeFade(root);
-
-  /* ---------------------------------------------------------------- API */
-  function apply(s) {
-    const split = s.split ?? 0;
-    const assemble = s.assemble ?? 0;
-    const drill = s.drill ?? 0;
-    const vis = s.showFront ?? 1;
-
-    parts.layers.forEach((g) => {
-      g.visible = vis > 0.01;
-      const splitY = g.userData.isPow
-        ? lerp(g.userData.yFront, g.userData.yBack, split)
-        : lerp(g.userData.yFront, g.userData.yMid, split);
-      // 合体：把摊开的层收回到器件上下，拼成一根完整的柱体
-      g.position.y = lerp(splitY, g.userData.yFinal, assemble);
-
-      g.traverse((o) => {
-        if (!o.material) return;
-        const arr = Array.isArray(o.material) ? o.material : [o.material];
-        for (const m of arr) {
-          if (m.uniforms) continue;
-          m.opacity = vis;
-          m.transparent = m.userData.origTransparent || vis < 0.99;
-          m.depthWrite = !(vis < 0.99);
-        }
-      });
-    });
-
-    // 玻璃壳跟着整摞的高度走
-    const splitTop = 0.72 + (parts.signalLayers.length - 1) * 0.40 + 0.55;
-    const splitBot = -1.15 - 2 * 0.72 - 0.45;
-    const topY = lerp(lerp(parts.frontTop + 0.6, splitTop, split), 0.52 + (parts.signalLayers.length - 1) * 0.40 + 0.55, assemble);
-    const botY = lerp(lerp(0.3, splitBot, split), -0.52 - 2 * 0.40 - 0.45, assemble);
-    const h = Math.max(topY - botY, 0.6);
-    beolGlass.scale.y = h;
-    beolGlass.position.y = botY + h / 2;
-    beolGlass.material.opacity = 0.045 * vis;
-
-    // nano-TSV：分离之后才露出来，逐个亮起
-    const topYt = -0.15;
-    const botYt = -0.90;
-    parts.tsvs.forEach((t, i) => {
-      const local = Math.min(1, Math.max(0, (drill - i * 0.07) / 0.7));
-      t.visible = assemble > 0.55 && local > 0.001;
-      const hh = (topYt - botYt) * local;
-      t.scale.y = Math.max(hh, 0.001);
-      t.position.y = topYt - hh / 2;
-    });
+  function apply({ split = 0, assemble = 0, detail = 0, time = 0 } = {}) {
+    signals.update(split, assemble, detail, visibility);
+    const { front, back, frontY, backY } = power.update(split, assemble, detail, visibility);
+    detailDevice.update(frontY, backY, signals.layers[0].layer.position.y, front, back, visibility);
+    markers.forEach(update => update(power.layers, time, detail, back * visibility));
+    substrateMat.opacity = visibility * (0.32 - detail * 0.24);
+    edgeMat.opacity = visibility * (0.46 - detail * 0.42);
   }
-
-  apply({ split: 0, drill: 0, land: 1, thick: 0 });
-
-  return { root, parts, anchors, fade, apply, kind: 'stack' };
+  apply();
+  return { root, parts: { substrate }, anchors, fade, apply, kind: 'stack' };
 }

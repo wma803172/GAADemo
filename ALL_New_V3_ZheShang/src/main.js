@@ -6,9 +6,9 @@ import * as THREE from 'three';
 import { createWorld } from './scene/setup.js';
 import { createStage } from './chapters/stage.js';
 import { tickMaterials } from './scene/materials.js';
-import { buildStory, renderStory, Rail, ScaleBar, Labels } from './ui/ui.js';
+import { buildStory, renderStory, Labels } from './ui/ui.js';
 import { CHAPTERS, chapterAt } from './content.js';
-import { clamp } from './core/util.js';
+import { clamp, srange, win } from './core/util.js';
 
 const canvas = document.getElementById('gl');
 const world = createWorld(canvas);
@@ -16,9 +16,16 @@ const { scene, camera, composer } = world;
 
 const stage = createStage(scene);
 const beats = buildStory(document.getElementById('story'));
-const rail = new Rail(document.getElementById('rail'));
-const scalebar = new ScaleBar(document.getElementById('scalebar'));
 const labels = new Labels(document.getElementById('labels'), camera, stage.models);
+const nav = Array.from(document.querySelectorAll('.chapter-nav a'));
+const gateSwitch = document.getElementById('gate-switch');
+let gateOn = true;
+gateSwitch.addEventListener('click', () => {
+  gateOn = !gateOn;
+  gateSwitch.setAttribute('aria-pressed', String(gateOn));
+  gateSwitch.querySelector('.gate-action').textContent = gateOn ? '关断沟道' : '接通沟道';
+  document.getElementById('gate-state').textContent = gateOn ? '四层沟道导通' : '四层沟道已关断';
+});
 
 /* --------------------------------------------------------------- 拖拽 */
 const view = { yaw: 0, pitch: 0 };
@@ -50,8 +57,11 @@ const hint = document.getElementById('hint');
 const loader = document.getElementById('loader');
 
 /* ------------------------------------------------------------- progress */
-const params = new URLSearchParams(location.search);
-const startT = params.has('t') ? clamp(parseFloat(params.get('t')), 0, 1) : 0;
+function urlProgress() {
+  const t = Number(new URLSearchParams(location.search).get('t'));
+  return Number.isFinite(t) ? clamp(t, 0, 1) : 0;
+}
+const startT = urlProgress();
 
 let targetP = startT;
 let p = startT;
@@ -73,6 +83,20 @@ if (startT > 0) {
   });
 }
 
+function seek(t) {
+  p = targetP = t;
+  window.scrollTo(0, t * scrollRange());
+}
+for (const link of nav) {
+  link.addEventListener('click', (e) => {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    history.pushState(null, '', link.href);
+    seek(Number(link.dataset.t));
+  });
+}
+window.addEventListener('popstate', () => seek(urlProgress()));
+
 window.addEventListener('scroll', () => {
   targetP = scrollToP();
   if (targetP > 0.004 && hint) hint.classList.add('is-off');
@@ -86,6 +110,7 @@ const jump = (dir) => {
   window.scrollTo({ top: pNew * scrollRange(), behavior: 'smooth' });
 };
 window.addEventListener('keydown', (e) => {
+  if (e.key === ' ' && e.target.closest?.('button, a, input')) return;
   if (e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === ' ') { e.preventDefault(); jump(1); }
   else if (e.key === 'ArrowUp' || e.key === 'PageUp') { e.preventDefault(); jump(-1); }
   else if (e.key === 'Home') { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
@@ -95,8 +120,7 @@ window.addEventListener('keydown', (e) => {
 /* ------------------------------------------------------------- resize */
 function applyFraming() {
   const w = window.innerWidth, h = window.innerHeight;
-  const shift = w > 900 ? 0.105 : 0.0;
-  camera.setViewOffset(w, h, -w * shift, 0, w, h);
+  camera.setViewOffset(w, h, w > 760 ? -w * 0.16 : 0, w > 760 ? 0 : h * 0.16, w, h);
 }
 applyFraming();
 window.addEventListener('resize', () => { world.resize(); applyFraming(); });
@@ -112,6 +136,7 @@ const qList = [['high', '高'], ['mid', '中'], ['low', '低']];
 qBtn?.addEventListener('click', () => {
   qIndex = (qIndex + 1) % qList.length;
   world.setQuality(qList[qIndex][0]);
+  applyFraming();
   qBtn.textContent = qList[qIndex][1];
 });
 
@@ -131,12 +156,15 @@ function render(now) {
   p += (targetP - p) * k;
   if (Math.abs(targetP - p) < 1e-5) p = targetP;
 
-  const out = stage.apply(p, time, view);
+  const out = stage.apply(p, time, view, gateOn);
 
   // 竖屏 / 窄屏：把相机整体往后退，保证主体不被裁掉
-  const fit = camera.aspect < 1.62
-    ? Math.min(1.62 / camera.aspect, 2.15) * (window.innerWidth < 760 ? 1.05 : 1)
+  const aspectFit = camera.aspect < 1.62
+    ? Math.min(1.62 / camera.aspect, 2.5)
     : 1;
+  const margin = 0.17 * (1 - srange(p, 0.535, 0.560)) +
+    0.15 * win(p, 0.739, 0.766, 0.791, 0.808);
+  const fit = aspectFit * (1 + margin);
   if (fit === 1) {
     camera.position.copy(out.cameraPos);
   } else {
@@ -145,6 +173,7 @@ function render(now) {
     );
   }
   camera.lookAt(out.cameraTarget);
+  camera.updateMatrixWorld();
   if (Math.abs(camera.fov - out.fov) > 0.01) {
     camera.fov = out.fov;
     camera.updateProjectionMatrix();
@@ -165,12 +194,15 @@ function render(now) {
     lastChapter = ci;
     labels.setChapter(CHAPTERS[ci]);
     chapterCount.textContent = String(ci + 1).padStart(2, '0') + ' / ' + String(CHAPTERS.length).padStart(2, '0');
+    const active = ci <= 5 ? 0 : ci === 6 ? 1 : ci <= 11 ? 2 : -1;
+    nav.forEach((link, i) => {
+      if (i === active) link.setAttribute('aria-current', 'location');
+      else link.removeAttribute('aria-current');
+    });
+    renderStory(beats, p);
   }
 
-  renderStory(beats, p);
-  rail.render(p);
-  scalebar.render(p);
-  labels.render(0.92);
+  labels.render();
   progressFill.style.width = (p * 100).toFixed(2) + '%';
 
   composer.render();
