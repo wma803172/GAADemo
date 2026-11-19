@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>fab preview</title>
+<style>html,body{margin:0;height:100%;background:#070b10;overflow:hidden}#c{display:block;width:100vw;height:100vh}#err{position:fixed;left:12px;top:12px;color:#ff8a8a;font:12px monospace;white-space:pre-wrap;z-index:9}</style>
+<script type="importmap">
+{ "imports": { "three": "/vendor/three/three.module.js", "three/addons/": "/vendor/three/addons/" } }
+</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<pre id="err"></pre>
+<script type="module">
+window.addEventListener('error', (e) => { document.getElementById('err').textContent += 'ERR: ' + e.message + '\n'; });
+try {
+  const THREE = await import('three');
+  const { buildFab } = await import('/src/models/fab.js');
+  const { createWorld } = await import('/src/scene/setup.js');
+
+  const step = Number(new URLSearchParams(location.search).get('step') || 0);
+  const world = createWorld(document.getElementById('c'));
+  const { scene, camera, composer } = world;
+
+  const fab = buildFab();
+  scene.add(fab.root);
+  fab.apply(step);
+
+  camera.position.set(11.5, 6.4, 11.2);
+  camera.lookAt(-1.9, 1.25, 0);
+  camera.fov = 30;
+  camera.updateProjectionMatrix();
+
+  (function frame() { composer.render(); requestAnimationFrame(frame); })();
+  window.__ready = true;
+} catch (e) {
+  document.getElementById('err').textContent = 'FAIL: ' + (e && e.message) + '\n' + (e && e.stack);
+}
+</script>
+</body>
+</html>
