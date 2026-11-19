@@ -1,24 +1,31 @@
 @echo off
+setlocal
 chcp 65001 >nul
-title Intel 18A - Silicon Atlas
+title Intel 18A
 cd /d "%~dp0"
-echo.
-echo   Intel 18A . 从一颗开关到一台电脑
-echo   ---------------------------------
-echo   本地预览地址: http://127.0.0.1:8123
-echo   关掉这个窗口即停止服务。
-echo.
-set NODE_EXE=node
+set "PAGE=http://127.0.0.1:8132/v3.2.html"
+curl.exe --noproxy "*" --fail --silent --max-time 1 "%PAGE%" >nul 2>nul && goto open
+set "NODE_EXE=node"
 where node >nul 2>nul
-if errorlevel 1 (
-  if exist "%LOCALAPPDATA%\Programs\nodejs\node.exe" (
-    set NODE_EXE=%LOCALAPPDATA%\Programs\nodejs\node.exe
-  ) else (
-    echo [x] 没有找到 Node.js。请先安装 https://nodejs.org 后再双击本文件。
-    pause
-    exit /b 1
-  )
+if errorlevel 1 set "NODE_EXE=%LOCALAPPDATA%\Programs\nodejs\node.exe"
+if not "%NODE_EXE%"=="node" if not exist "%NODE_EXE%" (
+  echo 需要 Node.js 18 或更新版本。
+  pause
+  exit /b 1
 )
-start "" cmd /c "timeout /t 2 >nul & start \"\" http://127.0.0.1:8123"
-%NODE_EXE% tools\serve.mjs . 8123
+start "" /b "%NODE_EXE%" tools\serve.mjs . 8132
+set "STARTED_HERE=1"
+for /l %%N in (1,1,12) do (
+  curl.exe --noproxy "*" --fail --silent --max-time 1 "%PAGE%" >nul 2>nul && goto open
+  timeout /t 1 /nobreak >nul
+)
+echo 无法在本机 8132 端口启动预览。
 pause
+exit /b 1
+
+:open
+start "" "%PAGE%"
+if defined STARTED_HERE (
+  echo 展示期间请保持此窗口打开。
+  pause >nul
+)

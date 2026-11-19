@@ -8,6 +8,7 @@ import { createStage } from './chapters/stage.js';
 import { tickMaterials } from './scene/materials.js';
 import { buildStory, renderStory, Rail, ScaleBar, Labels } from './ui/ui.js';
 import { CHAPTERS, chapterAt } from './content.js';
+import { languages, readLanguage, saveLanguage } from './ui/language.js';
 import { clamp } from './core/util.js';
 
 const canvas = document.getElementById('gl');
@@ -15,7 +16,10 @@ const world = createWorld(canvas);
 const { scene, camera, composer } = world;
 
 const stage = createStage(scene);
-const beats = buildStory(document.getElementById('story'));
+let language = readLanguage();
+let copy = languages[language];
+const story = document.getElementById('story');
+let beats = buildStory(story, copy.chapters, copy.scroll);
 const rail = new Rail(document.getElementById('rail'));
 const scalebar = new ScaleBar(document.getElementById('scalebar'));
 const labels = new Labels(document.getElementById('labels'), camera, stage.models);
@@ -43,7 +47,6 @@ const endDrag = () => { dragging = false; canvas.classList.remove('is-dragging')
 canvas.addEventListener('pointerup', endDrag);
 canvas.addEventListener('pointercancel', endDrag);
 
-const story = document.getElementById('story');
 const progressFill = document.getElementById('progress-fill');
 const chapterCount = document.getElementById('chapter-count');
 const hint = document.getElementById('hint');
@@ -86,6 +89,7 @@ const jump = (dir) => {
   window.scrollTo({ top: pNew * scrollRange(), behavior: 'smooth' });
 };
 window.addEventListener('keydown', (e) => {
+  if (e.target.closest?.('button')) return;
   if (e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === ' ') { e.preventDefault(); jump(1); }
   else if (e.key === 'ArrowUp' || e.key === 'PageUp') { e.preventDefault(); jump(-1); }
   else if (e.key === 'Home') { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
@@ -108,11 +112,50 @@ fullBtn?.addEventListener('click', () => {
 
 const qBtn = document.getElementById('btn-quality');
 let qIndex = 0;
-const qList = [['high', '高'], ['mid', '中'], ['low', '低']];
+const qList = ['high', 'mid', 'low'];
 qBtn?.addEventListener('click', () => {
   qIndex = (qIndex + 1) % qList.length;
-  world.setQuality(qList[qIndex][0]);
-  qBtn.textContent = qList[qIndex][1];
+  world.setQuality(qList[qIndex]);
+  updateControls();
+});
+
+const languageSwitch = document.querySelector('.language-switch');
+function updateControls() {
+  qBtn.textContent = copy.levels[qIndex];
+  qBtn.title = copy.quality;
+  qBtn.setAttribute('aria-label', copy.quality + ' · ' + copy.levels[qIndex]);
+  fullBtn.title = document.fullscreenElement ? copy.exitFull : copy.full;
+  fullBtn.setAttribute('aria-label', fullBtn.title);
+}
+
+function localizeControls() {
+  document.documentElement.lang = copy.lang;
+  document.title = copy.title;
+  document.querySelector('meta[name="description"]').content = copy.description;
+  document.querySelector('.brand-text i').textContent = copy.brand;
+  document.querySelector('.hint-text').textContent = copy.scroll;
+  document.getElementById('loader-text').textContent = copy.loading;
+  scalebar.note = copy.scale;
+  languageSwitch.setAttribute('aria-label', copy.switcher);
+  for (const button of languageSwitch.querySelectorAll('[data-lang]')) {
+    button.setAttribute('aria-pressed', String(button.dataset.lang === language));
+  }
+  updateControls();
+}
+localizeControls();
+document.addEventListener('fullscreenchange', updateControls);
+
+languageSwitch.addEventListener('click', event => {
+  const next = event.target.closest('button')?.dataset.lang;
+  if (!next || next === language) return;
+  language = next;
+  copy = languages[language];
+  saveLanguage(language);
+  localizeControls();
+  beats = buildStory(story, copy.chapters, copy.scroll);
+  lastChapter = renderStory(beats, p);
+  labels.setChapter(copy.chapters[lastChapter]);
+  scalebar.render(p);
 });
 
 /* --------------------------------------------------------------- loop */
@@ -157,13 +200,14 @@ function render(now) {
   world.floor.position.x = camera.position.x;
   world.floor.position.z = camera.position.z;
   world.floor.material.uniforms.uCenter.value.set(camera.position.x, camera.position.z);
+  world.sky.update(camera.aspect, p, time);
 
   tickMaterials(scene, time);
 
   const ci = chapterAt(p).index;
   if (ci !== lastChapter) {
     lastChapter = ci;
-    labels.setChapter(CHAPTERS[ci]);
+    labels.setChapter(copy.chapters[ci]);
     chapterCount.textContent = String(ci + 1).padStart(2, '0') + ' / ' + String(CHAPTERS.length).padStart(2, '0');
   }
 

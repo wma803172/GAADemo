@@ -5,13 +5,14 @@
 import * as THREE from 'three';
 import { CHAPTERS, chapterAt } from '../content.js';
 import { clamp, lerp } from '../core/util.js';
+import { placeCard } from './pin-placement.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 
 /* ------------------------------------------------------------------ story */
-export function buildStory(root) {
+export function buildStory(root, chapters = CHAPTERS, scrollCue = '向下滚动') {
   const frag = document.createDocumentFragment();
-  CHAPTERS.forEach((ch, i) => {
+  chapters.forEach((ch, i) => {
     const sec = document.createElement('section');
     sec.className = 'beat' + (ch.outro ? ' beat-outro' : '');
     sec.dataset.chapter = ch.id;
@@ -39,11 +40,11 @@ export function buildStory(root) {
       '<' + tag + ' data-rv>' + ch.title + '</' + tag + '>' +
       (ch.lead ? '<p class="lead"' + (i === 0 ? '' : ' data-rv') + '>' + ch.lead + '</p>' : '') +
       body + facts +
-      (i === 0 ? '<div class="scroll-cue" data-rv><span class="cue-arrow"></span>向下滚动</div>' : '');
+      (i === 0 ? '<div class="scroll-cue" data-rv><span class="cue-arrow"></span>' + scrollCue + '</div>' : '');
 
     frag.appendChild(sec);
   });
-  root.appendChild(frag);
+  root.replaceChildren(frag);
 
   const beats = Array.from(root.querySelectorAll('.beat'));
   beats.forEach((b) => {
@@ -157,7 +158,7 @@ export class Rail {
         it.el.style.top = y + 'px';
         it.el.classList.toggle('is-on', i === best && d < 0.035 && on);
         it.el.classList.toggle('is-past', it.p < p);
-        it.tick.setAttribute('x1', '62%');
+        it.tick.setAttribute('x1', '80%');
         it.tick.setAttribute('x2', '100%');
         it.tick.setAttribute('y1', String(y));
         it.tick.setAttribute('y2', String(y));
@@ -204,6 +205,7 @@ export class ScaleBar {
     this.fill = host.querySelector('#scalebar-fill');
     this.label = host.querySelector('#scalebar-label');
     this.hint = host.querySelector('#scalebar-hint');
+    this.note = this.hint.textContent;
     this.track = host.querySelector('.scalebar-track');
     this.lastLabel = '';
   }
@@ -230,7 +232,8 @@ export class ScaleBar {
     const on = p > 0.028 && p < 0.985;
     this.host.classList.toggle('is-on', on);
     this.hint.style.opacity = p > 0.815 ? '0.55' : '0';
-    this.hint.textContent = p > 0.815 ? '非等比例' : '';
+    const hint = p > 0.815 ? this.note : '';
+    if (this.hint.textContent !== hint) this.hint.textContent = hint;
   }
 }
 
@@ -246,8 +249,10 @@ export class Labels {
   }
 
   setChapter(ch) {
+    this.chapterId = ch.id;
+    this.measuredAt = '';
     this.active = (ch.labels || []).map((L) => {
-      const key = L.model + ':' + L.anchor + ':' + L.text;
+      const key = L.model + ':' + L.anchor + ':' + L.text + ':' + L.sub;
       let el = this.pool.get(key);
       if (!el) {
         el = document.createElement('div');
@@ -258,7 +263,7 @@ export class Labels {
         this.pool.set(key, el);
       }
       el.classList.remove('is-off');
-      return { el, L };
+      return { el, L, card: el.querySelector('.pin-card'), line: el.querySelector('.pin-line') };
     });
     // 隐藏不在本章的
     for (const [key, el] of this.pool) {
@@ -269,20 +274,50 @@ export class Labels {
   render(opacity) {
     if (!this.active.length) return;
     const w = window.innerWidth, h = window.innerHeight;
-    for (const { el, L } of this.active) {
-      const model = this.models[L.model];
-      if (!model) { el.style.opacity = '0'; continue; }
-      const a = model.anchors && model.anchors[L.anchor];
-      if (!a || !model.root.visible) { el.style.opacity = '0'; continue; }
+    const viewport = w + '/' + h;
+    if (this.measuredAt !== viewport) {
+      const beat = document.querySelector('.beat[data-chapter="' + this.chapterId + '"]');
+      this.copyBounds = beat?.getBoundingClientRect();
+      for (const pin of this.active) {
+        pin.width = pin.card.offsetWidth;
+        pin.height = pin.card.offsetHeight;
+      }
+      this.measuredAt = viewport;
+    }
+    this.camera.updateMatrixWorld();
+    const visible = [];
+    for (const pin of this.active) {
+      const { el, L } = pin;
+      const closeVia = L.model === 'stack' && L.anchor === 'tsv' && this.models.viaDev.root.visible;
+      const model = closeVia ? this.models.viaDev : this.models[L.model];
+      const a = model?.anchors[L.anchor];
+      if (!a || !model.root.visible || !a.parent.visible) { el.style.opacity = '0'; continue; }
+      a.updateWorldMatrix(true, false);
       this.v3.setFromMatrixPosition(a.matrixWorld);
       this.v3.project(this.camera);
-      const behind = this.v3.z > 1;
       const x = (this.v3.x * 0.5 + 0.5) * w;
       const y = (-this.v3.y * 0.5 + 0.5) * h;
-      const off = x < 40 || x > w - 40 || y < 50 || y > h - 40;
+      if (Math.abs(this.v3.z) > 1 || x < 5 || x > w - 5 || y < 40 || y > h - 12) {
+        el.style.opacity = '0';
+        continue;
+      }
+      pin.x = x;
+      pin.y = y;
       el.style.transform = 'translate(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px)';
-      el.style.opacity = behind || off ? '0' : String(opacity);
-      el.classList.toggle('flip', x > w * 0.66);
+      el.style.opacity = String(opacity);
+      visible.push(pin);
+    }
+    const bounds = { left: 10, right: w - (w > 760 ? 98 : 45), top: 63, bottom: h - 24 };
+    const occupied = this.copyBounds ? [this.copyBounds] : [];
+    const dots = visible.map(({ x, y }) => ({ left: x-3, right: x+3, top: y-3, bottom: y+3 }));
+    for (const pin of visible) {
+      const { rect, length, dx, dy, side, offset } = placeCard(pin, bounds, occupied, dots);
+      occupied.push(rect);
+      pin.side = side;
+      pin.offset = offset;
+      pin.el.classList.toggle('flip', side < 0);
+      pin.card.style.transform = 'translate(' + (rect.left-pin.x).toFixed(1) + 'px,' + (rect.top-pin.y).toFixed(1) + 'px)';
+      pin.line.style.transform = 'rotate(' + Math.atan2(dy,dx) + 'rad) scaleX(' + length.toFixed(1) + ')';
     }
   }
 }

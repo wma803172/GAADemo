@@ -4,8 +4,9 @@
    --------------------------------------------------------------------------- */
 import * as THREE from 'three';
 import { rbox } from './geo.js';
-import { silicon, channel, oxide, metal, gateGlass, rim, energyFlow } from '../scene/materials.js';
-import { edgeGlow, anchor, makeFade } from './common.js';
+import { silicon, channel, oxide, rim, energyFlow } from '../scene/materials.js';
+import { anchor, makeFade } from './common.js';
+import { cutBlock, cutawayGate, finishPlinth, surfaceMetal } from './finishes.js';
 
 export function buildPlanar() {
   const root = new THREE.Group();
@@ -13,19 +14,20 @@ export function buildPlanar() {
   const anchors = {};
 
   /* ---- 底座 + 衬底 -------------------------------------------------- */
-  const plinth = new THREE.Mesh(rbox(12.2, 0.55, 8.2, 0.10, 3), silicon({ color: 0x0b111a, roughness: 0.55 }));
+  const plinth = new THREE.Mesh(cutBlock(12.2, 0.55, 8.2, 0.27, 0.10), silicon({ color: 0x1c2831, roughness: 0.46 }));
   plinth.position.y = -1.42;
+  finishPlinth(plinth,12.2,0.55,8.2);
   root.add(plinth);
 
-  const sub = new THREE.Mesh(rbox(11, 1.35, 7, 0.07, 3), silicon({ color: 0x223142 }));
+  const sub = new THREE.Mesh(cutBlock(11, 1.35, 7, 0.19, 0.075), silicon({ color: 0x354657 }));
   sub.position.y = -0.695;
   root.add(sub);
   parts.substrate = sub;
 
   // 场氧（SiO₂）：铺在硅表面的一层，只在硅块边缘露出一圈
   const fieldOx = new THREE.Mesh(
-    rbox(11.04, 0.04, 7.04, 0.02, 2),
-    oxide({ color: 0x0b1420, extra: { metalness: 0.04, roughness: 0.92, clearcoat: 0.0, envMapIntensity: 0.35 } })
+    cutBlock(11.04, 0.04, 7.04, 0.19, 0.012),
+    oxide({ color: 0x162430, extra: { metalness: 0.14, roughness: 0.66, clearcoat: 0.08, envMapIntensity: 0.62 } })
   );
   fieldOx.position.y = -0.006;
   root.add(fieldOx);
@@ -35,13 +37,13 @@ export function buildPlanar() {
   const top = sub;
 
   /* ---- 源 / 漏 ------------------------------------------------------ */
-  const sdGeo = rbox(3.6, 0.30, 3.9, 0.05, 2);
+  const sdGeo = cutBlock(3.6, 0.30, 3.9, 0.17, 0.065);
   // 源漏用"暖金"而不是纯金属：纯金属在蓝色环境里会反射成橄榄色，读起来很脏
   const sdMat = channel({
-    color: 0xd8a049,
+    color: 0xd4a260,
     extra: {
-      metalness: 0.38, roughness: 0.62, clearcoat: 0.0, envMapIntensity: 0.40,
-      emissive: new THREE.Color(0x5a3608), emissiveIntensity: 0.85,
+      metalness: 0.30, roughness: 0.43, clearcoat: 0.12, envMapIntensity: 0.72,
+      emissive: new THREE.Color(0x55390e), emissiveIntensity: 0.41,
     },
   });
   const sL = new THREE.Mesh(sdGeo, sdMat.clone());
@@ -53,12 +55,17 @@ export function buildPlanar() {
   parts.drain = sR;
 
   // 源漏上的接触条：三条细金属，暗示上面还要接线
-  const barMat = metal(0x8d5f2c, { roughness: 0.5 });
+  const barMat = surfaceMetal(0xcfab72, 0.29);
+  const barrier = surfaceMetal(0x7e7460, 0.45);
+  const contactFoot = cutBlock(0.25, 0.052, 3.53, 0.095, 0.013);
+  const contactFace = cutBlock(0.17, 0.07, 3.46, 0.055, 0.017);
   for (const m of [sL, sR]) {
     for (let k = -1; k <= 1; k++) {
-      const bar = new THREE.Mesh(rbox(0.16, 0.07, 3.5, 0.02, 1), barMat);
-      bar.position.set(k * 0.85, 0.17, 0);
-      m.add(bar);
+      const foot = new THREE.Mesh(contactFoot, barrier);
+      foot.position.set(k*0.85,0.158,0);
+      const bar = new THREE.Mesh(contactFace,barMat);
+      bar.position.set(k*0.85,0.201,0);
+      m.add(foot,bar);
     }
   }
 
@@ -77,14 +84,15 @@ export function buildPlanar() {
   parts.channelFlow = flow;
 
   /* ---- 栅氧化层 ---------------------------------------------------- */
-  const gox = new THREE.Mesh(rbox(3.15, 0.045, 4.5, 0.02, 2), oxide({ color: 0x2a5d78 }));
+  const gateFilm = cutawayGate(0x78abaf,0.30);
+  const gox = new THREE.Mesh(cutBlock(3.15,0.045,4.5,0.10,0.012),gateFilm);
   gox.position.y = 0.245;
   root.add(gox);
   parts.gateOxide = gox;
 
   /* ---- 栅极（半透明） ------------------------------------------------ */
   const gate = new THREE.Group();
-  const gateBody = new THREE.Mesh(rbox(2.35, 0.62, 4.3, 0.05, 3), gateGlass({ color: 0xb2efff, opacity: 0.30 }));
+  const gateBody = new THREE.Mesh(cutBlock(2.35,0.62,4.3,0.11,0.047),cutawayGate(0xb5e6ef,0.25));
   gateBody.position.y = 0.60;
   gate.add(gateBody);
 
@@ -97,12 +105,16 @@ export function buildPlanar() {
   const cap = new THREE.Mesh(rbox(2.36, 0.03, 4.31, 0.02, 1), rim(0xbdf6ff, { power: 1.4, strength: 0.5, base: 0.06 }));
   cap.position.y = 0.915;
   gate.add(cap);
+  // Retain the back third of the upper metal cap in this see-through view.
+  const gateContact = new THREE.Mesh(cutBlock(2.30,0.080,1.05,0.10,0.020),surfaceMetal(0xb5bec0,0.27));
+  gateContact.position.set(0,0.89,-1.56);
+  gate.add(gateContact);
 
   // 栅极两侧的侧墙（spacer）：一层薄氧化物，把栅极和源漏隔开
   for (const sx of [-1, 1]) {
     const sp = new THREE.Mesh(
       rbox(0.16, 0.66, 4.34, 0.02, 1),
-      oxide({ color: 0x1c3448, extra: { metalness: 0.12, roughness: 0.7, clearcoat: 0.0, envMapIntensity: 0.5 } })
+      cutawayGate(0x86aabb,0.37)
     );
     sp.position.set(sx * (2.35 / 2 + 0.08), 0.60, 0);
     gate.add(sp);
@@ -150,10 +162,10 @@ export function buildPlanar() {
   parts.leakZone = leakZone;
 
   /* ---- 标签锚点 ----------------------------------------------------- */
-  anchors.gate = anchor(gate, 0, 0.96, 0, 'gate');
-  anchors.source = anchor(sL, 0, 0.42, 0, 'source');
-  anchors.drain = anchor(sR, 0, 0.42, 0, 'drain');
-  anchors.channel = anchor(ch, 0, 0.26, -1.6, 'channel');
+  anchors.gate = anchor(gate, 0, 0.93, -1.30, 'gate');
+  anchors.source = anchor(sL, -0.43, 0.15, 0.42, 'source');
+  anchors.drain = anchor(sR, 0.43, 0.15, 0.42, 'drain');
+  anchors.channel = anchor(ch, 1.38, 0.10, 1.12, 'channel');
   anchors.silicon = anchor(sub, -4.6, 0.2, 3.1, 'silicon');
   anchors.oxide = anchor(top, 3.6, 0.1, 3.1, 'oxide');
 

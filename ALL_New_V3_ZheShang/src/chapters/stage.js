@@ -8,9 +8,11 @@ import { buildPlanar } from '../models/planar.js';
 import { buildFinFET } from '../models/finfet.js';
 import { buildGAA } from '../models/gaa.js';
 import { buildStack } from '../models/stack.js';
+import { anchor } from '../models/common.js';
 import { buildDie, buildPackage, buildServer, buildLaptop } from '../models/macro.js';
-import { energyFlow, particlePoints } from '../scene/materials.js';
-import { clamp, lerp, srange, win, ease } from '../core/util.js';
+import { energyFlow } from '../scene/materials.js';
+import { channelCurrent } from './channel-current.js';
+import { lerp, srange, win, ease } from '../core/util.js';
 import { chapterAt } from '../content.js';
 
 /* ------------------------------------------------------------- camera rig */
@@ -70,15 +72,19 @@ export function createStage(scene) {
         color: 0x8ff2ff, density: 1.6, speed: 1.8,
         opacity: 0.9, rimOnly: 0.0, axis: [0, 1, 0],
       });
+      // This cylinder is horizontal once mounted. Sample its own axial
+      // coordinate so the trace runs from the bore to the contact after any drag.
+      fMat.vertexShader = fMat.vertexShader.replace('vW = wp.xyz;', 'vW = position;');
       fMat.depthTest = false;
       const f = new THREE.Mesh(new THREE.CylinderGeometry(0.20, 0.20, 0.9, 12, 1, true), fMat);
-      f.rotation.x = Math.PI / 2;
+      f.rotation.x = -dir * Math.PI / 2;
       f.position.set(0, m.cy, dir * (m.sdZ + 0.55));
       f.visible = false;
       dev.root.add(f);
       bores.push(f);
     }
     dev.parts.bores = bores;
+    dev.anchors.tsv = anchor(bores[2], 0.12, 0.16, 0.085, 'tsv');
 
     /* 上下连接线：器件顶上接着信号层、底下接着电源层的那些细金属 */
     const linkMat = new THREE.MeshStandardMaterial({
@@ -114,7 +120,7 @@ export function createStage(scene) {
     dev.parts.links = links;
   }
 
-  models.stack = buildStack({});
+  models.stack = buildStack({ device: models.gaa });
   models.die = buildDie();
   models.package = buildPackage();
   models.server = buildServer();
@@ -136,76 +142,11 @@ export function createStage(scene) {
   models.laptop.root.position.set(0, 0.6, 0);
   models.stack.root.position.set(0, 0, 0);
 
-  /* ------------------------------------------------- 接触面上的电子流 */
-  const particleSets = [];
-
-  function makeFlow(n, color) {
-    const pts = particlePoints(n, color);
-    scene.add(pts);
-    const set = {
-      points: pts,
-      data: [],
-      visible: 0,
-      // 每个粒子的参数
-    };
-    for (let i = 0; i < n; i++) {
-      set.data.push({
-        lane: i % 4,
-        u: Math.random(),
-        v: Math.random(),
-        speed: 0.18 + Math.random() * 0.35,
-        surf: Math.random() > 0.5 ? 1 : -1,
-      });
-    }
-    particleSets.push(set);
-    return set;
-  }
-
-  // GAA：四条硅带的上下表面
-  const gaaFlow = makeFlow(520, 0x9ff2ff);
-  // FinFET：鳍的两个侧面
-  const finFlow = makeFlow(300, 0x9ff2ff);
-
-  function updateParticles(time) {
-    // GAA
-    const gm = models.gaa.metrics;
-    const gv = models.gaa.parts.flowVisible ?? 0;
-    const gpos = gaaFlow.points.geometry.attributes.position;
-    const gLen = gm.gateLen * 1.06;
-    for (let i = 0; i < gaaFlow.data.length; i++) {
-      const d = gaaFlow.data[i];
-      const laneY = gm.stackBottom + d.lane * (0.16 + 0.42);
-      const u = (d.u + time * d.speed * 0.25) % 1;
-      const z = (u - 0.5) * gLen;
-      const x = (d.v - 0.5) * (gm.RIBBON_W + 0.12);
-      const y = laneY + d.surf * 0.115;
-      gpos.setXYZ(i, x, y, z);
-    }
-    gpos.needsUpdate = true;
-    gaaFlow.points.material.uniforms.uOpacity.value = gv;
-    gaaFlow.points.visible = gv > 0.01;
-
-    // FinFET（单鳍那台）
-    const fm = models.finfet.metrics;
-    const fv = models.finfet.parts.flowVisible ?? 0;
-    const fpos = finFlow.points.geometry.attributes.position;
-    for (let i = 0; i < finFlow.data.length; i++) {
-      const d = finFlow.data[i];
-      const u = (d.u + time * d.speed * 0.25) % 1;
-      const z = (u - 0.5) * models.finfet.gateLen * 1.1;
-      const side = d.lane % 2 === 0 ? 1 : -1;
-      const x = side * (0.34 / 2 + 0.06);
-      const y = 0.20 + (d.v * 0.9 + 0.1) * (models.finfet.finH + 0.1);
-      fpos.setXYZ(i, x, y, z);
-    }
-    fpos.needsUpdate = true;
-    finFlow.points.material.uniforms.uOpacity.value = fv;
-    finFlow.points.visible = fv > 0.01;
-  }
+  const current = channelCurrent(models);
 
   /* ------------------------------------------------------------ apply */
   function apply(p, time, view) {
-    const T = time;
+    current.clock.value = time;
 
     // 每帧清零：所有旋转都从这里"重新算"，不累积
     for (const k in models) models[k].root.rotation.set(0, 0, 0);
@@ -245,6 +186,7 @@ export function createStage(scene) {
       const sce = srange(p, 0.128, 0.196);
       const g = models.planar.parts.gate;
       g.scale.x = lerp(1, 0.42, sce);
+      current.planarGateScale.value = g.scale.x;
       // 栅极压下去一点点，强调"更薄的板子"
       g.position.y = lerp(0, -0.06, sce);
       // 栅极覆盖的那一段 = 受控区；栅极到漏极之间 = 失控区（漏极电场接管）
@@ -261,12 +203,10 @@ export function createStage(scene) {
       leak.scale.x = leakW;
       leak.position.x = gateHalf + leakW / 2;
       leak.material.opacity = sce * 0.36 * vPlanar;
-      const flow = models.planar.parts.channelFlow;
-      flow.visible = sce > 0.4;
-      if (flow.visible) {
-        flow.material.uniforms.uOpacity.value = 0.5 * vPlanar;
-        flow.scale.x = g.scale.x;
-      }
+      // Strong-on conduction transitions to a much fainter short-channel
+      // leakage cue. The warm drain-field overlay remains independent.
+      const demonstration = srange(p, 0.050, 0.076);
+      current.strength.planar.value = demonstration * lerp(1, 0.18, sce) * vPlanar;
       // 入场：整体轻微旋转 + 位置
       models.planar.root.rotation.y = lerp(-0.06, 0.02, srange(p, 0.05, 0.22));
     }
@@ -275,12 +215,9 @@ export function createStage(scene) {
     if (vFin > 0.001) {
       const m = models.finfet;
       const on = srange(p, 0.205, 0.245);
-      m.parts.flowMats.forEach((mat) => { mat.uniforms.uOpacity.value = on * 0.50 * vFin; });
-      m.parts.flowVisible = on * vFin;
+      current.strength.finfet.value = on * vFin;
       // 栅极包裹区高亮：把栅极玻璃稍微提亮
       m.parts.gateBody.material.opacity = lerp(0.18, 0.30, on);
-    } else {
-      models.finfet.parts.flowVisible = 0;
     }
 
     /* ---------------- 多鳍 ---------------- */
@@ -288,7 +225,7 @@ export function createStage(scene) {
       const on = srange(p, 0.292, 0.330);
       for (const key of ['multiDense', 'multiPerf']) {
         const m = models[key];
-        m.parts.flowMats.forEach((mat) => { mat.uniforms.uOpacity.value = on * 0.46 * vMulti; });
+        current.strength[key].value = on * vMulti;
         m.root.position.y = lerp(-0.3, 0, on);
       }
     }
@@ -296,12 +233,7 @@ export function createStage(scene) {
     /* ---------------- 3nm ---------------- */
     if (vN3 > 0.001) {
       const on = srange(p, 0.378, 0.415);
-      models.n3.parts.flowMats.forEach((mat) => { mat.uniforms.uOpacity.value = on * 0.85 * vN3; });
-      // 菱形不缩放；只在它和栅极的接触面上跑电流
-      (models.n3.parts.contactGlows || []).forEach((mat, i) => {
-        const k = srange(p, 0.386 + i * 0.006, 0.412 + i * 0.006);
-        mat.uniforms.uOpacity.value = k * on * vN3 * 0.55;
-      });
+      current.strength.n3.value = on * vN3;
       models.n3.root.rotation.y = lerp(0.55, 0.15, srange(p, 0.375, 0.462));
       // 退场：缩一点、往下沉一点，交接给 GAA 时才不会两坨模型叠在一起
       const outro = srange(p, 0.452, 0.468);
@@ -313,16 +245,13 @@ export function createStage(scene) {
     if (vGaa > 0.001) {
       const m = models.gaa;
       const on = srange(p, 0.462, 0.500);
-      m.parts.contactShells.forEach((sh) => { sh.material.uniforms.uOpacity.value = on * 0.46 * vGaa; });
-      m.parts.flowVisible = on * vGaa;
+      current.strength.gaa.value = on * vGaa;
       // 四条带子依次亮起
       m.parts.ribbons.forEach((r, i) => {
         const k = srange(p, 0.462 + i * 0.010, 0.500 + i * 0.010);
         r.scale.x = lerp(0.55, 1, k);
       });
       m.root.rotation.y = lerp(-0.10, 0.06, srange(p, 0.46, 0.575));
-    } else {
-      models.gaa.parts.flowVisible = 0;
     }
 
     /* ---------------- 互连 / PowerVia ---------------- */
@@ -371,7 +300,8 @@ export function createStage(scene) {
           b.position.y = -1.35 + h / 2;
         } else {
           // 电流：孔打通之后才亮
-          b.visible = onV > 0.02 && local > 0.45;
+          const reachedContact = -1.35 + 3.4 * local >= m.cy - 0.15;
+          b.visible = onV > 0.02 && reachedContact;
           b.material.uniforms.uOpacity.value = onV * vVia;
         }
       });
@@ -435,7 +365,6 @@ export function createStage(scene) {
       }
     }
 
-    updateParticles(time);
     return { cameraPos: _p, cameraTarget: _t, fov: lerp(from.fov, to.fov, k) };
   }
 

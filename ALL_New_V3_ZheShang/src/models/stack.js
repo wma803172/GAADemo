@@ -8,7 +8,8 @@
    --------------------------------------------------------------------------- */
 import * as THREE from 'three';
 import { rbox } from './geo.js';
-import { silicon, metal, gateGlass, energyFlow } from '../scene/materials.js';
+import { silicon, metal, cloneMaterials } from '../scene/materials.js';
+import { buildGAA } from './gaa.js';
 import { anchor, makeFade } from './common.js';
 import { lerp } from '../core/util.js';
 
@@ -34,7 +35,7 @@ const LAYOUT = [
 const FRONT_GAP = 0.56;
 const BACK_GAP = 0.66;
 
-export function buildStack() {
+export function buildStack({ device = buildGAA() } = {}) {
   const root = new THREE.Group();
   const parts = { layers: [], powerLayers: [], signalLayers: [], tsvs: [] };
   const anchors = {};
@@ -46,16 +47,17 @@ export function buildStack() {
   dev.add(sub);
   parts.substrate = sub;
 
-  const gate = new THREE.Mesh(rbox(1.7, 0.38, 0.78, 0.03, 2), gateGlass({ color: 0xbfefff, opacity: 0.26 }));
-  gate.position.y = 0.19;
-  dev.add(gate);
-  for (let i = 0; i < 4; i++) {
-    const r = new THREE.Mesh(rbox(1.4, 0.075, 1.8, 0.015, 1), new THREE.MeshStandardMaterial({
-      color: 0xd8e4ef, metalness: 0.35, roughness: 0.4,
-    }));
-    r.position.set(0, 0.055 + i * 0.11, 0);
-    dev.add(r);
+  // Fit the preceding RibbonFET into the same space as V3's overview icon.
+  // Share its geometry, but keep fades and channel-current materials independent.
+  const miniature = new THREE.Group();
+  const { cy, gateOuterW, gateOuterH, RIBBON_L } = device.metrics;
+  miniature.scale.set(1.7 / gateOuterW, 0.42 / gateOuterH, 1.8 / RIBBON_L);
+  miniature.position.y = (gateOuterH / 2 - cy) * miniature.scale.y;
+  for (const member of [...device.parts.ribbons, ...device.parts.terminals, device.parts.gate]) {
+    miniature.add(member.clone());
   }
+  cloneMaterials(miniature);
+  dev.add(miniature);
   root.add(dev);
   parts.device = dev;
 
@@ -79,6 +81,8 @@ export function buildStack() {
       if (cfg.dir === 'z') bar.position.x = t * (LAYER_W - 0.9);
       else bar.position.z = t * (LAYER_D - 0.9);
       g.add(bar);
+      if (i === 2 && k === cfg.n - 1) anchors.rail = anchor(bar, len * 0.30, 0.11, 0, 'rail');
+      if (i === 3 && k === cfg.n - 2) anchors.signals = anchor(bar, 0, 0.045, len * 0.27, 'signals');
     }
 
     // 层与层之间的小过孔，让整摞看起来是连着的
@@ -141,10 +145,8 @@ export function buildStack() {
   root.add(beolGlass);
   parts.beolGlass = beolGlass;
 
-  anchors.tsv = anchor(root, 0, -0.45, 0, 'tsv');
-  anchors.rail = anchor(root, LAYER_W / 2, 1.2, 0, 'rail');
-  anchors.signals = anchor(root, 0, 3.4, 0, 'signals');
-  anchors.device = anchor(root, 0, 0.25, 0, 'device');
+  anchors.tsv = anchor(parts.tsvs[3], 0.075, 0, 0, 'tsv');
+  anchors.device = anchor(miniature, 0, cy + gateOuterH / 2, 0, 'device');
 
   const fade = makeFade(root);
 

@@ -7,8 +7,9 @@
    --------------------------------------------------------------------------- */
 import * as THREE from 'three';
 import { rbox, extrude } from './geo.js';
-import { silicon, channel, oxide, metal, gateGlass, rim, energyFlow } from '../scene/materials.js';
+import { silicon, channel, oxide, rim, energyFlow } from '../scene/materials.js';
 import { anchor, makeFade } from './common.js';
+import { cutBlock, cutawayGate, finishPlinth, gateSection, surfaceMetal } from './finishes.js';
 
 const FIN_PITCH = 1.20;
 const STI_TOP = 0.50;
@@ -37,20 +38,21 @@ export function buildFinFET(opts = {}) {
   const finZ = diamond ? gateLen + 1.30 : finLen;
 
   /* ---- 衬底 -------------------------------------------------------- */
-  const sub = new THREE.Mesh(rbox(subW, 1.05, subD, 0.06, 3), silicon({ color: 0x1d2b3a }));
+  const sub = new THREE.Mesh(cutBlock(subW,1.05,subD,0.17,0.065),silicon({ color: 0x354657 }));
   sub.position.y = -0.525;
   root.add(sub);
   parts.substrate = sub;
 
   const plinth = new THREE.Mesh(
-    rbox(subW + 0.7, 0.40, subD + 0.7, 0.08, 2),
-    silicon({ color: 0x080f16, roughness: 0.7, metalness: 0.25 })
+    cutBlock(subW+0.7,0.40,subD+0.7,0.22,0.07),
+    silicon({ color: 0x1c2831, roughness: 0.46, metalness: 0.25 })
   );
   plinth.position.y = -1.25;
+  finishPlinth(plinth,subW+0.7,0.40,subD+0.7);
   root.add(plinth);
 
   /* ---- STI --------------------------------------------------------- */
-  const sti = new THREE.Mesh(rbox(spanX + 1.7, STI_TOP, finZ + 0.5, 0.04, 2), oxide({ color: 0x0e1a26 }));
+  const sti = new THREE.Mesh(cutBlock(spanX+1.7,STI_TOP,finZ+0.5,0.12,0.045),oxide({ color: 0x203542 }));
   sti.position.y = STI_TOP / 2;
   root.add(sti);
   parts.sti = sti;
@@ -80,10 +82,23 @@ export function buildFinFET(opts = {}) {
 
   let finGeo;
   if (diamond) {
-    finGeo = extrude(diamondProfile(1, 1), finZ, { bevel: 0.018, bevelSegments: 1 });
+    const profile = diamondProfile(1,1);
+    finGeo = new THREE.ExtrudeGeometry(profile,{
+      depth:finZ, steps:8, bevelEnabled:true, bevelSize:0.016, bevelThickness:0.016, bevelSegments:2,
+    });
+    finGeo.translate(0,0,-finZ/2);
+    // Narrow only the exposed ends. The gated section keeps the original
+    // diamond profile so its close-fitting current traces still coincide.
+    const pos=finGeo.attributes.position;
+    for (let i=0; i<pos.count; i++) {
+      const amount=THREE.MathUtils.smoothstep(Math.abs(pos.getZ(i)),finZ*0.33,finZ*0.50);
+      pos.setX(i,pos.getX(i)*(1-0.075*amount));
+      pos.setY(i,pos.getY(i)*(1-0.032*amount));
+    }
+    finGeo.computeVertexNormals();
     finGeo.translate(0, FIN_BOTTOM, 0);
   } else {
-    finGeo = rbox(finW, finTotal, finZ, 0.025, 2);
+    finGeo = rbox(finW,finTotal,finZ,0.045,3);
   }
   for (let i = 0; i < finCount; i++) {
     const g = new THREE.Group();
@@ -92,7 +107,7 @@ export function buildFinFET(opts = {}) {
     // 3nm 的鳍本质上仍是 FinFET，颜色沿用前面几代鳍的那一套 channel 材质，
     // 不再整条通电流（旧版那个绿色 energyFlow 已移除）。
     // 和前面几代 FinFET 完全一样的浅灰蓝，整条不带任何动画
-    const finMat = channel({ color: 0xc8dcec, metalness: 0.34, roughness: 0.26 });
+    const finMat=channel({color:0xb9ccda,extra:{metalness:0.23,roughness:0.34,clearcoat:0.24,clearcoatRoughness:0.25}});
     const fin = new THREE.Mesh(finGeo, finMat);
     fin.position.y = diamond ? 0 : (FIN_BOTTOM + finTop) / 2;
     g.add(fin);
@@ -120,7 +135,7 @@ export function buildFinFET(opts = {}) {
   const gateH = gateTop - gateBottom;
   const gate = new THREE.Group();
 
-  const gBody = new THREE.Mesh(rbox(gateW, gateH, gateLen, 0.04, 3), gateGlass({ color: 0xbef0ff, opacity: 0.11 }));
+  const gBody = new THREE.Mesh(rbox(gateW,gateH,gateLen,0.048,3),cutawayGate(0xbadae7,0.17));
   gBody.position.y = (gateBottom + gateTop) / 2;
   gate.add(gBody);
 
@@ -133,6 +148,37 @@ export function buildFinFET(opts = {}) {
   const cap = new THREE.Mesh(rbox(gateW + 0.02, 0.05, gateLen + 0.02, 0.02, 1), rim(0xcaf7ff, { power: 2.2, strength: 0.18, base: 0.02 }));
   cap.position.y = gateTop + 0.025;
   gate.add(cap);
+
+  // A thin metal slice remains at the far face of the cutaway. Cut the
+  // actual fin profiles out of its lower edge, so the shared gate covers
+  // the top and sides of every fin and never runs through the silicon.
+  const face = new THREE.Shape();
+  const half = finW/2+(diamond?0.012:0.038);
+  face.moveTo(-gateW/2,gateBottom);
+  for (const {x} of parts.fins) {
+    face.lineTo(x-half,gateBottom);
+    if (diamond) {
+      face.lineTo(x-half,FIN_BOTTOM+stemTopL);
+      face.lineTo(x-DIA_W/2-0.012,FIN_BOTTOM+diaCyL);
+      face.lineTo(x,FIN_BOTTOM+diaCyL+DIA_H/2+0.035);
+      face.lineTo(x+DIA_W/2+0.012,FIN_BOTTOM+diaCyL);
+      face.lineTo(x+half,FIN_BOTTOM+stemTopL);
+    } else {
+      face.lineTo(x-half,finTop+0.045);
+      face.lineTo(x+half,finTop+0.045);
+    }
+    face.lineTo(x+half,gateBottom);
+  }
+  face.lineTo(gateW/2,gateBottom);
+  face.lineTo(gateW/2,gateTop);
+  face.lineTo(-gateW/2,gateTop);
+  face.closePath();
+  const section = new THREE.Mesh(extrude(face,gateLen*0.115,{bevel:0.005,bevelSegments:2}),gateSection());
+  section.position.z=-gateLen*0.421;
+  gate.add(section);
+  const crown = new THREE.Mesh(cutBlock(gateW-0.05,0.053,gateLen*0.28,0.034,0.010),surfaceMetal(0xa8bebd,0.33));
+  crown.position.set(0,gateTop-0.022,-gateLen*0.331);
+  gate.add(crown);
 
   root.add(gate);
   parts.gate = gate;
@@ -185,14 +231,20 @@ export function buildFinFET(opts = {}) {
   } else {
     for (const dir of [-1, 1]) {
       const box = new THREE.Mesh(
-        rbox(spanX + 0.95, finH * 0.80, 0.85, 0.04, 2),
-        channel({ color: 0xc08d58, metalness: 0.5, roughness: 0.28 })
+        cutBlock(spanX+0.95,finH*0.80,0.85,0.10,0.06,0.115),
+        channel({color:0xb78958,extra:{metalness:0.24,roughness:0.42,clearcoat:0.16}})
       );
       box.position.set(0, STI_TOP + finH * 0.46, dir * sdZ);
       root.add(box);
       sd.push(box);
 
-      const capM = new THREE.Mesh(rbox(spanX + 1.1, 0.12, 0.85, 0.03, 2), metal(0xb87f43, { roughness: 0.30 }));
+      const landingY = box.position.y + finH * 0.4;
+      const capBottom = STI_TOP + finH * 0.92 - 0.06;
+      const collarH = Math.max(capBottom - landingY + 0.025,0.035);
+      const collar = new THREE.Mesh(cutBlock(spanX+0.91,collarH,0.74,0.10,0.014),surfaceMetal(0x8b8373,0.42));
+      collar.position.set(0,capBottom-collarH/2+0.008,dir*sdZ);
+      root.add(collar);
+      const capM = new THREE.Mesh(cutBlock(spanX+1.1,0.12,0.85,0.11,0.029),surfaceMetal(0xd2b489,0.29));
       capM.position.set(0, STI_TOP + finH * 0.92, dir * sdZ);
       root.add(capM);
     }
@@ -221,12 +273,13 @@ export function buildFinFET(opts = {}) {
   parts.contactGlows = contactGlows;
 
   /* ---- 标签锚点 ----------------------------------------------------- */
-  anchors.gate = anchor(gate, 0, gateH / 2 + 0.12, 0, 'gate');
+  anchors.gate = anchor(gate, gateW * 0.18, gateTop, -gateLen * 0.42, 'gate');
   if (diamond) {
-    anchors.fin = anchor(root, spanX / 2 + DIA_W * 0.5, FIN_BOTTOM + diaCyL, 0, 'fin');
-    anchors.sd = anchor(root, 0, gateTop - 0.1, 0, 'sd');
+    anchors.fin = anchor(root, spanX / 2 + DIA_W * 0.35, FIN_BOTTOM + diaCyL + DIA_H * 0.15, finZ * 0.32, 'fin');
+    anchors.sd = anchors.gate; // Original N3 caption maps the key "sd" to the gate.
   } else {
-    anchors.fin = anchor(root, spanX / 2 + 0.12, STI_TOP + finH * 0.86, finZ / 2 - 0.35, 'fin');
+    const freeFinZ = (gateLen / 2 + sdZ - 0.85 / 2) / 2;
+    anchors.fin = anchor(root, spanX / 2 + finW / 2, STI_TOP + finH * 0.86, freeFinZ, 'fin');
     anchors.sd = anchor(root, spanX / 2, STI_TOP + finH * 0.62, sdZ, 'sd');
   }
   anchors.channel = anchor(root, 0, STI_TOP + finH * 0.5, -finZ / 2 + 0.2, 'channel');

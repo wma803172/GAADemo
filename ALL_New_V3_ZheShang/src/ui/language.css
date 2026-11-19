@@ -1,0 +1,14 @@
+.language-switch{
+  display:inline-flex;align-items:stretch;border:1px solid var(--hair-strong);
+  border-radius:3px;background:rgba(8,18,28,.76);overflow:hidden;
+}
+.language-switch button{
+  appearance:none;border:0;background:none;color:var(--paper-dim);font:600 .75rem/1 var(--font);
+  min-width:2.4rem;min-height:28px;padding:0 .53rem;cursor:pointer;
+}
+.language-switch button[aria-pressed="true"]{background:rgba(79,210,240,.17);color:#b8f4ff}
+.language-switch button:focus-visible{outline:2px solid var(--cyan-hot);outline-offset:-3px}
+.language-switch button:hover{color:#fff}
+html:lang(en) .beat h1,html:lang(en) .beat h2{word-break:normal;letter-spacing:-.04em}
+html:lang(en) .beat:not(.beat-outro) p:not(.kicker){line-height:1.52}
+html:lang(en) .beat .kicker{letter-spacing:.1em}

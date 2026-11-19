@@ -3,7 +3,7 @@ import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize, resolve } from 'node:path';
 
 const root = resolve(process.argv[2] ?? '.');
-const port = Number(process.argv[3] ?? 8123);
+const port = Number(process.argv[3] ?? 8132);
 const types = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',

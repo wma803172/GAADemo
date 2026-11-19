@@ -7,6 +7,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { buildNightSky } from './night-sky.js';
 
 export const PALETTE = {
   ink: 0x04070b,
@@ -192,6 +193,8 @@ export function createWorld(canvas) {
 
   const floor = buildFloor();
   scene.add(floor);
+  const sky = buildNightSky();
+  scene.add(sky.mesh);
 
   // 跟着相机走的补光：不管镜头在哪，正面总有一点"眼神光"
   const head = new THREE.DirectionalLight(0xcde6ff, 0.55);
@@ -203,6 +206,12 @@ export function createWorld(canvas) {
 
   /* ------------------------------------------------------------ composer */
   const composer = new EffectComposer(renderer);
+  // Geometry is drawn into the composer's offscreen buffer before blooming.
+  // Multisample that buffer as well, especially for the narrow fins and ribbons.
+  const gl = renderer.getContext();
+  const supported = gl.getInternalformatParameter(gl.RENDERBUFFER, gl.RGBA16F, gl.SAMPLES);
+  const edgeSamples = Array.from(supported ?? []).find(samples => samples <= 4) ?? 0;
+  for (const target of [composer.renderTarget1, composer.renderTarget2]) target.samples = edgeSamples;
   const renderPass = new RenderPass(scene, camera);
   composer.addPass(renderPass);
 
@@ -229,10 +238,16 @@ export function createWorld(canvas) {
 
   function setQuality(q) {
     quality = q;
+    const samples = q === 'high' ? edgeSamples : 0;
+    for (const target of [composer.renderTarget1, composer.renderTarget2]) {
+      if (target.samples !== samples) {
+        target.dispose();
+        target.samples = samples;
+      }
+    }
     if (q === 'low') {
       dpr = Math.min(window.devicePixelRatio || 1, 1.0);
       bloom.enabled = false;
-      renderer.toneMappingExposure = 1.0;
     } else if (q === 'mid') {
       dpr = Math.min(window.devicePixelRatio || 1, 1.25);
       bloom.enabled = true;
@@ -242,11 +257,12 @@ export function createWorld(canvas) {
       bloom.enabled = true;
       bloom.strength = 0.24;
     }
+    renderer.toneMappingExposure = q === 'low' ? 1.0 : 0.98;
     resize();
   }
 
   return {
-    renderer, scene, camera, composer, bloom, floor,
+    renderer, scene, camera, composer, bloom, floor, sky,
     envMap, key, rim, fill, warm, head, headTarget,
     resize, setQuality,
     get quality() { return quality; },

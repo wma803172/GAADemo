@@ -101,7 +101,7 @@ body{
 }
 
 /* ------------------------------------------------------------------ story */
-.story{position:relative;z-index:5}
+.story{position:relative;z-index:5;pointer-events:none}
 .story{height:1350vh}
 .beat{
   position:fixed;z-index:6;
@@ -177,14 +177,15 @@ body{
 .hud-rail.is-on{opacity:1}
 .hud-rail svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
 .rail-year{
-  position:absolute;right:clamp(18px,2.6vw,42px);
+  position:absolute;right:calc(clamp(18px,2.6vw,42px) + 7px);z-index:1;
   transform:translateY(-50%);
-  font-size:.64rem;letter-spacing:.09em;
-  color:rgba(150,180,205,.42);
+  padding:1px 4px;border-radius:2px;background:#09131dee;
+  font-size:.75rem;letter-spacing:.055em;font-variant-numeric:tabular-nums;
+  color:#a3bccd;
   white-space:nowrap;
   transition:color .4s var(--ease),font-size .4s var(--ease),text-shadow .4s var(--ease);
 }
-.rail-year.is-past{color:rgba(150,185,215,.62)}
+.rail-year.is-past{color:#b4cbd9}
 .rail-year.is-on{
   color:var(--cyan-hot);font-size:.82rem;
   text-shadow:0 0 16px rgba(79,210,240,.65);
@@ -298,25 +299,22 @@ body{
   transition:opacity .35s var(--ease);
 }
 .pin-dot{
-  position:absolute;left:-3px;top:-3px;width:6px;height:6px;border-radius:50%;
-  background:var(--cyan-hot);box-shadow:0 0 10px 2px rgba(79,210,240,.55);
+  position:absolute;left:-3px;top:-3px;width:6px;height:6px;border-radius:50%;z-index:1;
+  background:#d4f7ff;box-shadow:0 0 0 2px #19485f,0 0 8px #6ccee77a;
 }
 .pin-line{
-  position:absolute;left:0;top:0;width:26px;height:1px;
-  background:linear-gradient(90deg,rgba(140,230,255,.9),rgba(140,230,255,0));
-  transform:rotate(-28deg);transform-origin:0 0;
+  position:absolute;left:0;top:0;width:1px;height:1px;
+  background:#a2e3f6;transform-origin:0 50%;
 }
 .pin-card{
-  position:absolute;left:26px;top:-12px;
-  display:flex;flex-direction:column;gap:.1rem;
-  padding:.4rem .58rem;
-  background:rgba(6,14,22,.72);
-  border:1px solid rgba(120,200,240,.20);
-  border-left:2px solid rgba(79,210,240,.75);
-  white-space:nowrap;
+  position:absolute;left:0;top:0;
+  display:flex;flex-direction:column;gap:2px;padding:6px 10px 7px;
+  background:linear-gradient(120deg,#172939f5,#101c2af5);
+  border:1px solid #55778a;border-left:2px solid #82dff3;border-radius:3px;
+  box-shadow:0 3px 12px #02091048;white-space:nowrap;
 }
-.pin-card b{font-size:.68rem;font-weight:550;letter-spacing:.04em;color:#e8f6ff}
-.pin-card i{font-style:normal;font-size:.6rem;color:rgba(150,190,220,.72);letter-spacing:.08em}
+.pin-card b{font:600 .875rem/1.18 var(--font);letter-spacing:.012em;color:#f3f9fc}
+.pin-card i{font:400 .75rem/1.35 var(--font);letter-spacing:.015em;color:#bad6e4}
 .pin.is-off{opacity:0 !important}
 
 .rail-cursor{
@@ -361,7 +359,7 @@ body{
 }
 
 @media (max-width:760px){
-  .pin-card{left:20px;top:-8px;padding:.32rem .48rem}
+  .pin-card{padding:.32rem .48rem}
   .pin-card b{font-size:.6rem}
   .pin-card i{font-size:.52rem}
 }
@@ -374,15 +372,9 @@ body{
 
 /* 鏍囩闈犺繎鍙宠竟缂樻椂缈诲埌宸﹁竟 */
 .pin.flip .pin-card{
-  left:auto;right:26px;
-  border-left:1px solid rgba(120,200,240,.20);
-  border-right:2px solid rgba(79,210,240,.75);
+  border-left:1px solid #55778a;
+  border-right:2px solid #82dff3;
   text-align:right;align-items:flex-end;
-}
-.pin.flip .pin-line{
-  left:auto;right:0;
-  transform:rotate(28deg);transform-origin:100% 0;
-  background:linear-gradient(270deg,rgba(140,230,255,.9),rgba(140,230,255,0));
 }
 
 
