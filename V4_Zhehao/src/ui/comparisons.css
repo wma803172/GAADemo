@@ -1,0 +1,164 @@
+.lab-experiments {
+  position: relative;
+  z-index: 10;
+  background: #0a1119;
+  color: #eaf3fb;
+  line-height: 1.65;
+}
+.lab-inner {
+  width: min(1100px, calc(100% - 2 * var(--pad-x)));
+  margin-inline: auto;
+  padding-block: clamp(48px, 7vw, 88px) clamp(64px, 8vw, 110px);
+}
+.lab-intro, .lab-row { scroll-margin-top: 75px }
+.lab-intro h2, .lab-copy h3, .lab-copy h4, .lab-cross h4 {
+  margin: 0;
+  color: #eaf3fb;
+  font-weight: 600;
+  line-height: 1.32;
+}
+.lab-intro h2 { font-size: clamp(32px, 4vw, 58px); letter-spacing: -.04em }
+.lab-intro > p, .lab-copy > p, .lab-table-wrap p {
+  max-width: 49em;
+  margin: 12px 0 0;
+  color: #abbaC7;
+}
+.lab-wafer { margin: 26px 0 0 }
+.lab-wafer img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 56svh;
+  object-fit: cover;
+  border: 1px solid #2d4050;
+  border-radius: 10px;
+}
+.lab-wafer figcaption { margin-top: 8px; color: #9fb3c1; font-size: .81rem }
+.lab-row {
+  margin-top: clamp(40px, 6vw, 76px);
+  padding-top: clamp(25px, 3.6vw, 45px);
+  border-top: 1px solid #2e404e;
+  display: grid;
+  grid-template-columns: minmax(0, .87fr) minmax(0, 1fr);
+  gap: clamp(28px, 6vw, 88px);
+  align-items: center;
+}
+.lab-copy h3 { font-size: clamp(21px, 2.4vw, 34px); letter-spacing: -.035em }
+.lab-copy p { font-size: clamp(.91rem, 1.2vw, 1.04rem) }
+.lab-copy h4 { font-size: .93rem; margin-top: 24px }
+.lab-control {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 15px;
+  padding: 3px;
+  border-radius: 9px;
+  background: #0a141c;
+  border: 1px solid #3b505f;
+}
+.lab-control button {
+  appearance: none;
+  min-height: 39px;
+  border: 0;
+  padding: 7px clamp(9px, 1.1vw, 16px);
+  border-radius: 5px;
+  background: transparent;
+  color: #b7cbd8;
+  font: 550 .86rem/1.35 var(--font);
+  cursor: pointer;
+}
+.lab-control button:hover { background: #142b37; color: white }
+.lab-control button[aria-pressed="true"] { color: #072533; background: #96deea }
+.lab-control button:focus-visible, .lab-experiments a:focus-visible, .lab-entry:focus-visible {
+  outline: 2px solid #a6eef8;
+  outline-offset: 3px;
+}
+.lab-width-controls .lab-control { margin-top: 8px }
+.lab-width-controls .lab-state { font-size: .85rem; margin: 10px 0 0; color: #adc4ce }
+.lab-figure, .lab-table-wrap {
+  margin: 0;
+  padding: clamp(14px, 2.4vw, 28px);
+  border: 1px solid #304656;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #172733, #0f1a24 72%);
+}
+.lab-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 15px;
+  align-items: start;
+}
+.lab-pair:not([data-view="both"]) { grid-template-columns: minmax(0, 1fr) }
+.lab-cross { min-width: 0; text-align: center }
+.lab-cross h4 { font: 550 1rem/1.35 var(--font) }
+.lab-cross svg { display: block; width: min(100%, 194px); height: auto; margin: 14px auto 4px }
+.lab-cross > span { font-size: .81rem; color: #cbdbe4 }
+.lab-sheets { transform-origin: 95px 73px; transform: scaleX(.68); transition: transform .32s ease }
+.lab-pair[data-width="wide"] .lab-sheets { transform: scaleX(1.16) }
+.lab-legend, .lab-result {
+  border-top: 1px solid #334650;
+  margin-top: 9px;
+  padding-top: 12px;
+  text-align: center;
+  color: #c8d7df;
+  font-size: .83rem;
+}
+.lab-legend { grid-column: 1 / -1; display: flex; justify-content: center; flex-wrap: wrap; gap: 14px }
+.lab-legend span::before {
+  content: "";
+  display: inline-block;
+  width: .58em;
+  height: .58em;
+  border-radius: 2px;
+  margin-right: 5px;
+  background: #ffaf65;
+}
+.lab-legend span:nth-child(2)::before { background: #99ece0 }
+.lab-legend span:nth-child(3)::before { background: #a9bcca }
+.lab-circuit svg { display: block; width: min(100%, 400px); height: auto; margin: 0 auto }
+.lab-circuit svg text { fill: #c9d8e1; font: 13px var(--font) }
+.lab-circuit svg .lab-vdd, .lab-circuit svg .lab-vss { text-anchor: middle; font-weight: 600 }
+.lab-circuit svg .lab-vdd { fill: #ffc576 }
+.lab-circuit svg .lab-vss { fill: #9bbfff }
+.lab-circuit svg .lab-signal { fill: #83dbd0 }
+.lab-upper, .lab-lower { stroke: #748491 }
+.lab-switch-p, .lab-switch-n { stroke-width: 4; transition: transform .22s ease, stroke .22s }
+.lab-switch-p { transform-origin: 166px 72px }
+.lab-switch-n { transform-origin: 166px 125px }
+.lab-circuit[data-level="0"] .lab-switch-n, .lab-circuit[data-level="1"] .lab-switch-p { transform: rotate(-32deg) }
+.lab-circuit[data-level="0"] :is(.lab-upper, .lab-output) { stroke: #ffc576 }
+.lab-circuit[data-level="1"] :is(.lab-lower, .lab-output) { stroke: #9bbfff }
+.lab-circuit[data-level="0"] svg .lab-output-text { fill: #ffc576 }
+.lab-circuit[data-level="1"] svg .lab-output-text { fill: #9bbfff }
+.lab-table-wrap table { width: 100%; border-collapse: collapse; text-align: left }
+.lab-table-wrap caption { text-align: left; margin-bottom: 12px; font-size: .87rem; color: #c2d0da }
+.lab-table-wrap th, .lab-table-wrap td { border-bottom: 1px solid #354a57; padding: 12px 5px 12px 0 }
+.lab-table-wrap thead th { font-size: .77rem; font-weight: 500; color: #b5c8d4; line-height: 1.4 }
+.lab-table-wrap tbody th { font: 500 .95rem/1.4 var(--mono) }
+.lab-table-wrap td { color: #8ee6f1; font: 600 clamp(.98rem, 1.7vw, 1.4rem)/1.45 var(--font); white-space: nowrap }
+.lab-table-wrap p, .lab-table-wrap a { font-size: .8rem }
+.lab-table-wrap a { color: #9adfeb; text-underline-offset: 3px }
+.lab-entry {
+  display: inline-block;
+  margin: .55rem .35rem 0 0;
+  padding: .35rem .6rem;
+  color: #a4e9f1;
+  border: 1px solid #406370;
+  border-radius: 5px;
+  background: #10212d;
+  font: 520 .77rem/1.45 var(--font);
+  text-decoration: none;
+  pointer-events: auto;
+}
+.lab-entry:hover { background: #193240; color: white }
+.lab-experiments [hidden] { display: none }
+@media (max-width: 760px) {
+  .lab-inner { width: calc(100% - 36px) }
+  .lab-row { grid-template-columns: minmax(0, 1fr); gap: 18px }
+  .lab-control button { min-height: 44px }
+  .lab-entry { margin-top: .32rem; padding-block: .35rem }
+  .lab-wafer img { max-height: none }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lab-sheets, .lab-switch-p, .lab-switch-n { transition: none }
+}
